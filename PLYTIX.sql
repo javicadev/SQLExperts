@@ -1260,52 +1260,55 @@ END;
 PROCEDURE p_actualizar_productos (
   p_cuentaid IN cuenta.id%TYPE
 ) IS
-  -- Cursor para obtener los productos externos de la cuenta
+  -- Cursor para recorrer productos externos vinculados a la cuenta
   CURSOR c_ext IS
     SELECT gtin, nombre FROM productos_ext WHERE cuentaid = p_cuentaid;
 
-  -- Cursor para obtener los productos internos actuales de la cuenta
+  -- Cursor para recorrer los productos existentes en la tabla PRODUCTO
   CURSOR c_int IS
     SELECT gtin FROM producto WHERE cuentaid = p_cuentaid;
 
-  -- Variable para comparar nombres
+  -- Variable para comparar el nombre actual
   v_nombre_actual producto.nombre%TYPE;
 
-  -- Tabla PL/SQL para registrar los GTINs vistos en productos_ext
+  -- Tabla hash para registrar GTINs ya procesados desde productos_ext
   TYPE t_gtins IS TABLE OF BOOLEAN INDEX BY BINARY_INTEGER;
   tabla_ext t_gtins;
 
 BEGIN
-  -- Paso 0: Verificar acceso del usuario
+  -- Paso 0: Verificar que el usuario tiene acceso a la cuenta
   IF NOT f_verificar_cuenta_usuario(p_cuentaid) THEN
     RAISE_APPLICATION_ERROR(-20001, 'Acceso denegado');
   END IF;
 
-  -- Paso 1: Recorrer productos externos y sincronizar
+  -- Paso 1: Recorrer productos externos
   FOR r IN c_ext LOOP
     BEGIN
-      -- Paso 1.1: Ver si el producto ya existe
+      -- Paso 1.1: Verificar si el producto ya existe en la tabla PRODUCTO
       SELECT nombre INTO v_nombre_actual
       FROM producto
       WHERE gtin = r.gtin AND cuentaid = p_cuentaid;
 
-      -- Paso 1.2: Si el nombre ha cambiado, actualizarlo
+      -- Paso 1.2: Si existe y el nombre ha cambiado, se actualiza
       IF v_nombre_actual != r.nombre THEN
         p_actualizar_nombre_producto(r.gtin, p_cuentaid, r.nombre);
       END IF;
 
     EXCEPTION
-      -- Paso 1.3: Si no existe el producto, insertarlo
+      -- Paso 1.3: Si no existe el producto, se inserta uno nuevo
       WHEN NO_DATA_FOUND THEN
-        INSERT INTO producto (gtin, nombre, cuentaid)
-        VALUES (r.gtin, r.nombre, p_cuentaid);
+        INSERT INTO producto (
+          gtin, nombre, cuentaid, creado
+        ) VALUES (
+          r.gtin, r.nombre, p_cuentaid, SYSDATE
+        );
     END;
 
-    -- Paso 1.4: Registrar que ese GTIN existe en productos_ext
+    -- Paso 1.4: Marcar este GTIN como procesado en la tabla hash
     tabla_ext(r.gtin) := TRUE;
   END LOOP;
 
-  -- Paso 2: Recorrer productos internos y eliminar los que no están en productos_ext
+  -- Paso 2: Eliminar productos que existen en PRODUCTO pero no en PRODUCTOS_EXT
   FOR r IN c_int LOOP
     IF NOT tabla_ext.EXISTS(r.gtin) THEN
       p_eliminar_producto_y_asociaciones(r.gtin, p_cuentaid);
@@ -1313,7 +1316,6 @@ BEGIN
   END LOOP;
 
 EXCEPTION
-  -- Manejo general de errores
   WHEN OTHERS THEN
     INSERT INTO traza VALUES (
       SYSDATE, USER, $$PLSQL_UNIT,
