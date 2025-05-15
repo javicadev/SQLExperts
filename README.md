@@ -45,7 +45,7 @@ Incluido en los scripts y prácticas:
 - `P_MIGRAR_PRODUCTOS_A_CATEGORIA`: Migra productos de una categoría a otra.
 - `P_REPLICAR_ATRIBUTOS`: Copia o actualiza atributos de un producto a otro.
 
-
+---
 ## 🧪 Sistema de pruebas automatizado
 En la tabla de resultados_pruebas -> SELECT * FROM resultados_pruebas ORDER BY fecha DESC;
 
