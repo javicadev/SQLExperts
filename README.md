@@ -1,6 +1,6 @@
-# 📦 Proyecto PL/SQL - Administración de Productos y Activos (UMA 2024-25)
+# 📦 Proyecto Administración Bases de datos - Plytix (UMA 2024-25)
 
-Este proyecto implementa la lógica de negocio y administración de productos, cuentas y activos, en dos niveles de complejidad (paquete básico y paquete avanzado), integrando además el nivel físico y seguridad de base de datos, pruebas automatizadas y jobs programados.
+Este proyecto implementa la parte de gestión a nivel de base de datos, un sistema de gestión de información de productos (PIM) inspirado en soluciones como Plytix, orientado a pequeñas y medianas empresas. Su objetivo es centralizar, organizar y distribuir eficientemente la información de productos, facilitando la colaboración entre equipos y la integración con múltiples canales de venta.
 
 ---
 
