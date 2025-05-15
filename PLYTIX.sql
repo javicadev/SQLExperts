@@ -905,6 +905,8 @@ end pkg_admin_productos;
 /
 
 -- AHORA DEBEMOS DESARROLLAR EL CUERPO DEL PAQUETE
+
+-- AHORA DEBEMOS DESARROLLAR EL CUERPO DEL PAQUETE
 create or replace package body pkg_admin_productos is
 
    -- Función auxiliar: valida que el usuario conectado pertenece a la cuenta dada
@@ -936,7 +938,6 @@ create or replace package body pkg_admin_productos is
                                     || sqlerrm );
          return false;
    end f_verificar_cuenta_usuario;
-
 
 
    --1. FUNCION F_OBTENER_PLAN_CUENTA
@@ -1047,7 +1048,7 @@ create or replace package body pkg_admin_productos is
 
    -- 3. FUNCION F_VALIDAR_ATRIBUTOS_PRODUCTO
    function f_validar_atributos_producto (
-      p_producto_gtin in producto.gtin%type,
+      p_productogtin in producto.gtin%type,
       p_cuentaid     in producto.cuentaid%type
    ) return boolean is
       v_total_atributos     number;
@@ -1066,7 +1067,7 @@ create or replace package body pkg_admin_productos is
       select 1
         into v_dummy
         from producto
-       where gtin = p_producto_gtin
+       where gtin = p_productogtin
          and cuentaid = p_cuentaid;
 
       -- Paso 2: Contar atributos definidos para la cuenta
@@ -1075,12 +1076,12 @@ create or replace package body pkg_admin_productos is
         from atributo
        where cuentaid = p_cuentaid;
 
-      -- Paso 3: Contar atributos asignados al producto en ATRIBUTO_PRODUCTO
-      select count(distinct atributo_codigo)
+      -- Paso 3: Contar atributos asignados al producto en atributoproducto
+      select count(distinct atributoid)
         into v_atributos_asignados
-        from atributo_producto
-       where producto_gtin = p_producto_gtin
-         and producto_cuentaid = p_cuentaid;
+        from atributoproducto
+       where productogtin = p_productogtin
+         and productocuentaid = p_cuentaid;
 
       -- Paso 4: Comparar y devolver resultado lógico
       if v_total_atributos = v_atributos_asignados then
@@ -1158,7 +1159,7 @@ create or replace package body pkg_admin_productos is
 
    --5. PROCEDURE P_ACTUALIZAR_NOMBRE_PRODUCTO
    procedure p_actualizar_nombre_producto (
-      p_producto_gtin in producto.gtin%type,
+      p_productogtin in producto.gtin%type,
       p_cuentaid     in producto.cuentaid%type,
       p_nuevo_nombre  in producto.nombre%type
    ) is
@@ -1186,14 +1187,14 @@ create or replace package body pkg_admin_productos is
       select 1
         into v_dummy
         from producto
-       where gtin = p_producto_gtin
+       where gtin = p_productogtin
          and cuentaid = p_cuentaid;
 
       -- Paso 3: Actualizar el nombre del producto
       update producto
          set
          nombre = p_nuevo_nombre
-       where gtin = p_producto_gtin
+       where gtin = p_productogtin
          and cuentaid = p_cuentaid;
 
       dbms_output.put_line('Nombre del producto actualizado correctamente.');
@@ -1223,15 +1224,15 @@ create or replace package body pkg_admin_productos is
    --6. PROCEDURE P_ASOCIAR_ACTIVO_A_PRODUCTO
 
    procedure p_asociar_activo_a_producto (
-      p_producto_gtin      in producto.gtin%type,
-      p_producto_cuentaid in producto.cuentaid%type,
+      p_productogtin      in producto.gtin%type,
+      p_productocuentaid in producto.cuentaid%type,
       p_activo_id          in activo.id%type,
       p_activo_cuentaid   in activo.cuentaid%type
    ) is
       v_dummy number;
    begin
       -- Paso 0: Verificar que el usuario tiene acceso a ambas cuentas
-      if not f_verificar_cuenta_usuario(p_producto_cuentaid)
+      if not f_verificar_cuenta_usuario(p_productocuentaid)
       or not f_verificar_cuenta_usuario(p_activo_cuentaid) then
          raise_application_error(
             -20001,
@@ -1244,8 +1245,8 @@ create or replace package body pkg_admin_productos is
          select 1
            into v_dummy
            from producto
-          where gtin = p_producto_gtin
-            and cuentaid = p_producto_cuentaid;
+          where gtin = p_productogtin
+            and cuentaid = p_productocuentaid;
       exception
          when no_data_found then
             insert into traza values ( sysdate,
@@ -1275,9 +1276,9 @@ create or replace package body pkg_admin_productos is
       begin
          select 1
            into v_dummy
-           from act_pro
-          where producto_gtin = p_producto_gtin
-            and producto_cuentaid = p_producto_cuentaid
+           from relacionproductoactivo
+          where productogtin = p_productogtin
+            and productocuentaid = p_productocuentaid
             and activo_id = p_activo_id
             and activo_cuentaid = p_activo_cuentaid;
 
@@ -1293,13 +1294,13 @@ create or replace package body pkg_admin_productos is
       end;
 
       -- Paso 4: Crear la nueva asociación
-      insert into act_pro (
-         producto_gtin,
-         producto_cuentaid,
+      insert into relacionproductoactivo (
+         productogtin,
+         productocuentaid,
          activo_id,
          activo_cuentaid
-      ) values ( p_producto_gtin,
-                 p_producto_cuentaid,
+      ) values ( p_productogtin,
+                 p_productocuentaid,
                  p_activo_id,
                  p_activo_cuentaid );
 
@@ -1322,7 +1323,7 @@ create or replace package body pkg_admin_productos is
 
    --7. PROCEDURE P_ELIMINAR_PRODUCTO_Y_ASOCIACIONES
    procedure p_eliminar_producto_y_asociaciones (
-      p_producto_gtin in producto.gtin%type,
+      p_productogtin in producto.gtin%type,
       p_cuentaid     in producto.cuentaid%type
    ) is
       v_dummy number;
@@ -1339,36 +1340,36 @@ create or replace package body pkg_admin_productos is
       select 1
         into v_dummy
         from producto
-       where gtin = p_producto_gtin
+       where gtin = p_productogtin
          and cuentaid = p_cuentaid;
 
       -- Paso 2: Iniciar bloque transaccional
       begin
-         -- Eliminar relaciones de la tabla ACT_PRO
-         delete from act_pro
-          where producto_gtin = p_producto_gtin
-            and producto_cuentaid = p_cuentaid;
+         -- Eliminar relaciones de la tabla relacionproductoactivo
+         delete from relacionproductoactivo
+          where productogtin = p_productogtin
+            and productocuentaid = p_cuentaid;
 
-         -- Eliminar valores de la tabla ATRIBUTO_PRODUCTO
-         delete from atributo_producto
-          where producto_gtin = p_producto_gtin
-            and producto_cuentaid = p_cuentaid;
+         -- Eliminar valores de la tabla atributoproducto
+         delete from atributoproducto
+          where productogtin = p_productogtin
+            and productocuentaid = p_cuentaid;
 
-         -- Eliminar asociaciones de categoría en PROD_CAT
-         delete from prod_cat
-          where producto_gtin = p_producto_gtin
-            and producto_cuentaid = p_cuentaid;
+         -- Eliminar asociaciones de categoría en relacionproductocategoria
+         delete from relacionproductocategoria
+          where productogtin = p_productogtin
+            and productocuentaid = p_cuentaid;
 
          -- Eliminar relaciones en la tabla RELACIONADO
          delete from relacionado
-          where ( producto1_gtin = p_producto_gtin
+          where ( producto1_gtin = p_productogtin
             and producto1_cuentaid = p_cuentaid )
-             or ( producto2_gtin = p_producto_gtin
+             or ( producto2_gtin = p_productogtin
             and producto2_cuentaid = p_cuentaid );
 
          -- Finalmente, eliminar el producto
          delete from producto
-          where gtin = p_producto_gtin
+          where gtin = p_productogtin
             and cuentaid = p_cuentaid;
 
          dbms_output.put_line('Producto y todas sus asociaciones eliminados correctamente.');
@@ -1504,12 +1505,12 @@ create or replace package body pkg_admin_productos is
       insert into usuario (
          nombreusuario,
          cuentaid,
-         nombre_completo,
+         nombrecompleto,
          correoelectronico,
          telefono
       ) values ( p_usuario.nombreusuario,
                  p_usuario.cuentaid,
-                 p_usuario.nombre_completo,
+                 p_usuario.nombrecompleto,
                  p_usuario.correoelectronico,
                  p_usuario.telefono );
 
