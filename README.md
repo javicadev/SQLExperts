@@ -6,12 +6,12 @@ Este proyecto implementa la lógica de negocio y administración de productos, c
 
 ## 📁 Contenido del proyecto
 
-| Archivo SQL                                             | Descripción                                                                 |
-|---------------------------------------------------------|------------------------------------------------------------------|
-| 'PLYTIX.sql'                                            | Archivo SQL con todo el contenido del trabajo                    |
-| 'InfraestructuraYBateriaPruebasPKGBasico.sql'           | Infraestructura (Pruebas automatizadas) + Pruebas paquete básico |
-| 'BateriaPruebasPKGAvanzado'                             | Pruebas paquete avanzado + ejecución de jobs del paquete avanzado|
-| 'RubricaPlytix.xsls'                                    | Rúbrica completa                                                 |
+| Archivo SQL                                                                 | Descripción                                                                 |
+|-----------------------------------------------------------------------------|-----------------------------------------------------------------------------|
+| [PLYTIX.sql](PLYTIX.sql)                                                   | Archivo SQL con todo el contenido del trabajo                              |
+| [test/InfraestructuraYBateriaPruebasPKGBasico.sql](test/InfraestructuraYBateriaPruebasPKGBasico.sql) | Infraestructura (Pruebas automatizadas) + Pruebas paquete básico           |
+| [test/PruebasPKGAvanzado.sql](test/PruebasPKGAvanzado.sql)                 | Pruebas paquete avanzado + ejecución de jobs del paquete avanzado          |
+| [RubricaPlitixDEFINITIVO.xlsx](RubricaPlitixDEFINITIVO.xlsx)               | Rúbrica completa                                                            |
 
 ---
 
