@@ -1322,19 +1322,6 @@ EXCEPTION
     RAISE;
 END p_actualizar_productos;
 
-  -- Paso 2: Eliminar productos que ya no están
-  FOR r IN c_int LOOP
-    IF NOT tabla_ext.EXISTS(r.gtin) THEN
-      p_eliminar_producto_y_asociaciones(r.gtin, p_cuentaid);
-    END IF;
-  END LOOP;
-
-EXCEPTION
-  WHEN OTHERS THEN
-    INSERT INTO traza VALUES (SYSDATE, USER, $$PLSQL_UNIT, SQLCODE || ' ' || SQLERRM);
-    RAISE;
-END;
-
 --P9: P_CREAR_USUARIO
 -- Crea un nuevo usuario de base de datos, lo asocia a cuenta y otorga permisos.
 -- Parámetros:
