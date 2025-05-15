@@ -882,8 +882,8 @@ create or replace package pkg_admin_productos is
    procedure p_asociar_activo_a_producto (
       p_producto_gtin      in producto.gtin%type,
       p_producto_cuentaid in producto.cuentaid%type,
-      p_activo_id          in activos.id%type,
-      p_activo_cuentaid   in activos.cuentaid%type
+      p_activo_id          in activo.id%type,
+      p_activo_cuentaid   in activo.cuentaid%type
    );
 
    procedure p_eliminar_producto_y_asociaciones (
@@ -902,9 +902,9 @@ create or replace package pkg_admin_productos is
    );
 
 end pkg_admin_productos;
+/
 
 -- AHORA DEBEMOS DESARROLLAR EL CUERPO DEL PAQUETE
-
 create or replace package body pkg_admin_productos is
 
    -- Función auxiliar: valida que el usuario conectado pertenece a la cuenta dada
@@ -916,7 +916,7 @@ create or replace package body pkg_admin_productos is
       select 1
         into v_dummy
         from usuario
-       where upper(nombre_usuario) = upper(user)
+       where upper(nombreusuario) = upper(user)
          and cuentaid = p_cuentaid;
 
       return true;
@@ -944,7 +944,7 @@ create or replace package body pkg_admin_productos is
       p_cuentaid in cuenta.id%type
    ) return plan%rowtype is
       v_plan    plan%rowtype;
-      v_plan_id cuenta.plan_id%type;
+      v_planid cuenta.planid%type;
    begin
       -- Paso 0: Verificar que el usuario conectado tiene acceso a esta cuenta
       if not f_verificar_cuenta_usuario(p_cuentaid) then
@@ -954,14 +954,14 @@ create or replace package body pkg_admin_productos is
          );
       end if;
 
-      -- Paso 1: Buscar el plan_id de la cuenta. Esto también valida que la cuenta existe
-      select plan_id
-        into v_plan_id
+      -- Paso 1: Buscar el planid de la cuenta. Esto también valida que la cuenta existe
+      select planid
+        into v_planid
         from cuenta
        where id = p_cuentaid;
 
       -- Paso 2: Verificar si el plan está asignado
-      if v_plan_id is null then
+      if v_planid is null then
          insert into traza values ( sysdate,
                                     user,
                                     $$plsql_unit,
@@ -973,7 +973,7 @@ create or replace package body pkg_admin_productos is
       select *
         into v_plan
         from plan
-       where id = v_plan_id;
+       where id = v_planid;
 
       return v_plan;
    exception
@@ -1225,8 +1225,8 @@ create or replace package body pkg_admin_productos is
    procedure p_asociar_activo_a_producto (
       p_producto_gtin      in producto.gtin%type,
       p_producto_cuentaid in producto.cuentaid%type,
-      p_activo_id          in activos.id%type,
-      p_activo_cuentaid   in activos.cuentaid%type
+      p_activo_id          in activo.id%type,
+      p_activo_cuentaid   in activo.cuentaid%type
    ) is
       v_dummy number;
    begin
@@ -1259,7 +1259,7 @@ create or replace package body pkg_admin_productos is
       begin
          select 1
            into v_dummy
-           from activos
+           from activo
           where id = p_activo_id
             and cuentaid = p_activo_cuentaid;
       exception
@@ -1502,20 +1502,20 @@ create or replace package body pkg_admin_productos is
    begin
       -- Paso 1: Insertar en la tabla USUARIO
       insert into usuario (
-         nombre_usuario,
+         nombreusuario,
          cuentaid,
          nombre_completo,
-         email,
+         correoelectronico,
          telefono
-      ) values ( p_usuario.nombre_usuario,
+      ) values ( p_usuario.nombreusuario,
                  p_usuario.cuentaid,
                  p_usuario.nombre_completo,
-                 p_usuario.email,
+                 p_usuario.correoelectronico,
                  p_usuario.telefono );
 
       -- Paso 2: Crear usuario de base de datos
       execute immediate 'CREATE USER '
-                        || p_usuario.nombre_usuario
+                        || p_usuario.nombreusuario
                         || ' IDENTIFIED BY "'
                         || p_password
                         || '"';
@@ -1524,17 +1524,17 @@ create or replace package body pkg_admin_productos is
       execute immediate 'GRANT '
                         || p_rol
                         || ' TO '
-                        || p_usuario.nombre_usuario;
+                        || p_usuario.nombreusuario;
 
       -- Paso 4: Conceder permisos básicos (ejemplo: conexión, uso de sinónimos, etc.)
-      execute immediate 'GRANT CONNECT TO ' || p_usuario.nombre_usuario;
-      execute immediate 'GRANT SELECT, INSERT, UPDATE, DELETE ON producto TO ' || p_usuario.nombre_usuario;
+      execute immediate 'GRANT CONNECT TO ' || p_usuario.nombreusuario;
+      execute immediate 'GRANT SELECT, INSERT, UPDATE, DELETE ON producto TO ' || p_usuario.nombreusuario;
 
       -- Paso 5: Crear sinónimos (ejemplo)
       execute immediate 'CREATE SYNONYM '
-                        || p_usuario.nombre_usuario
+                        || p_usuario.nombreusuario
                         || '.producto FOR producto';
-      dbms_output.put_line('Usuario creado correctamente con nombre: ' || p_usuario.nombre_usuario);
+      dbms_output.put_line('Usuario creado correctamente con nombre: ' || p_usuario.nombreusuario);
    exception
       when others then
          insert into traza values ( sysdate,
@@ -1550,6 +1550,7 @@ create or replace package body pkg_admin_productos is
 
 -- CERRAMOS PAQUETE
 end pkg_admin_productos;
+/
 
 -- PRUEBAS APARTE!!
 
