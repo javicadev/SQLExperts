@@ -450,6 +450,11 @@ alter table usuario
    add constraint usuariocuentafkv2 foreign key ( cuentadueno )
       references cuenta ( id );
 
+
+-- Ponemos el NIF UNIQUE en cuenta
+ALTER TABLE cuenta
+ADD CONSTRAINT uq_cuenta_nif UNIQUE (nif);
+
 -- 3. HEMOS IMPORTADO DATOS (TODO OK)
 -- ¿COMO HEMOS IMPORTADO LOS DATOS? SIGUIENDO EL MANUAL DE LA PRACTICA E IMPORTANDO LOS CSV
 
