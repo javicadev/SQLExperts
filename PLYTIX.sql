@@ -841,6 +841,7 @@ create table traza (
 
 -- Ahora toca desarrollar el paquete que nos pide en el enunciado
 
+
 create or replace package pkg_admin_productos is
 
    -- Excepciones personalizadas
@@ -850,48 +851,48 @@ create or replace package pkg_admin_productos is
 
    -- Función de control de pertenencia
    function f_verificar_cuenta_usuario (
-      p_cuenta_id in cuenta.id%type
+      p_cuentaid in cuenta.id%type
    ) return boolean;
 
    -- FUNCIONES
    function f_obtener_plan_cuenta (
-      p_cuenta_id in cuenta.id%type
+      p_cuentaid in cuenta.id%type
    ) return plan%rowtype;
 
    function f_contar_productos_cuenta (
-      p_cuenta_id in cuenta.id%type
+      p_cuentaid in cuenta.id%type
    ) return number;
 
    function f_validar_atributos_producto (
       p_producto_gtin in producto.gtin%type,
-      p_cuenta_id     in producto.cuenta_id%type
+      p_cuentaid     in producto.cuentaid%type
    ) return boolean;
 
    function f_num_categorias_cuenta (
-      p_cuenta_id in cuenta.id%type
+      p_cuentaid in cuenta.id%type
    ) return number;
 
    -- PROCEDIMIENTOS
    procedure p_actualizar_nombre_producto (
       p_producto_gtin in producto.gtin%type,
-      p_cuenta_id     in producto.cuenta_id%type,
+      p_cuentaid     in producto.cuentaid%type,
       p_nuevo_nombre  in producto.nombre%type
    );
 
    procedure p_asociar_activo_a_producto (
       p_producto_gtin      in producto.gtin%type,
-      p_producto_cuenta_id in producto.cuenta_id%type,
+      p_producto_cuentaid in producto.cuentaid%type,
       p_activo_id          in activos.id%type,
-      p_activo_cuenta_id   in activos.cuenta_id%type
+      p_activo_cuentaid   in activos.cuentaid%type
    );
 
    procedure p_eliminar_producto_y_asociaciones (
       p_producto_gtin in producto.gtin%type,
-      p_cuenta_id     in producto.cuenta_id%type
+      p_cuentaid     in producto.cuentaid%type
    );
 
    procedure p_actualizar_productos (
-      p_cuenta_id in cuenta.id%type
+      p_cuentaid in cuenta.id%type
    );
 
    procedure p_crear_usuario (
@@ -908,7 +909,7 @@ create or replace package body pkg_admin_productos is
 
    -- Función auxiliar: valida que el usuario conectado pertenece a la cuenta dada
    function f_verificar_cuenta_usuario (
-      p_cuenta_id in cuenta.id%type
+      p_cuentaid in cuenta.id%type
    ) return boolean is
       v_dummy number;
    begin
@@ -916,7 +917,7 @@ create or replace package body pkg_admin_productos is
         into v_dummy
         from usuario
        where upper(nombre_usuario) = upper(user)
-         and cuenta_id = p_cuenta_id;
+         and cuentaid = p_cuentaid;
 
       return true;
    exception
@@ -924,7 +925,7 @@ create or replace package body pkg_admin_productos is
          insert into traza values ( sysdate,
                                     user,
                                     $$plsql_unit,
-                                    'Acceso denegado a cuenta ID: ' || p_cuenta_id );
+                                    'Acceso denegado a cuenta ID: ' || p_cuentaid );
          return false;
       when others then
          insert into traza values ( sysdate,
@@ -940,13 +941,13 @@ create or replace package body pkg_admin_productos is
 
    --1. FUNCION F_OBTENER_PLAN_CUENTA
    function f_obtener_plan_cuenta (
-      p_cuenta_id in cuenta.id%type
+      p_cuentaid in cuenta.id%type
    ) return plan%rowtype is
       v_plan    plan%rowtype;
       v_plan_id cuenta.plan_id%type;
    begin
       -- Paso 0: Verificar que el usuario conectado tiene acceso a esta cuenta
-      if not f_verificar_cuenta_usuario(p_cuenta_id) then
+      if not f_verificar_cuenta_usuario(p_cuentaid) then
          raise_application_error(
             -20001,
             'Acceso denegado: esta cuenta no pertenece al usuario.'
@@ -957,7 +958,7 @@ create or replace package body pkg_admin_productos is
       select plan_id
         into v_plan_id
         from cuenta
-       where id = p_cuenta_id;
+       where id = p_cuentaid;
 
       -- Paso 2: Verificar si el plan está asignado
       if v_plan_id is null then
@@ -998,13 +999,13 @@ create or replace package body pkg_admin_productos is
 
    -- 2. FUNCION F_CONTAR_PRODUCTOS_CUENTA
    function f_contar_productos_cuenta (
-      p_cuenta_id in cuenta.id%type
+      p_cuentaid in cuenta.id%type
    ) return number is
       v_total number;
       v_dummy number;
    begin
       -- Paso 0: Verificar que el usuario tiene acceso a esta cuenta
-      if not f_verificar_cuenta_usuario(p_cuenta_id) then
+      if not f_verificar_cuenta_usuario(p_cuentaid) then
          raise_application_error(
             -20001,
             'Acceso denegado: esta cuenta no pertenece al usuario.'
@@ -1015,13 +1016,13 @@ create or replace package body pkg_admin_productos is
       select 1
         into v_dummy
         from cuenta
-       where id = p_cuenta_id;
+       where id = p_cuentaid;
 
       -- Paso 2: Contar los productos asociados a esa cuenta
       select count(*)
         into v_total
         from producto
-       where cuenta_id = p_cuenta_id;
+       where cuentaid = p_cuentaid;
 
       return v_total;
    exception
@@ -1047,14 +1048,14 @@ create or replace package body pkg_admin_productos is
    -- 3. FUNCION F_VALIDAR_ATRIBUTOS_PRODUCTO
    function f_validar_atributos_producto (
       p_producto_gtin in producto.gtin%type,
-      p_cuenta_id     in producto.cuenta_id%type
+      p_cuentaid     in producto.cuentaid%type
    ) return boolean is
       v_total_atributos     number;
       v_atributos_asignados number;
       v_dummy               number;
    begin
       -- Paso 0: Verificar que el usuario tiene permiso sobre la cuenta
-      if not f_verificar_cuenta_usuario(p_cuenta_id) then
+      if not f_verificar_cuenta_usuario(p_cuentaid) then
          raise_application_error(
             -20001,
             'Acceso denegado: esta cuenta no pertenece al usuario.'
@@ -1066,20 +1067,20 @@ create or replace package body pkg_admin_productos is
         into v_dummy
         from producto
        where gtin = p_producto_gtin
-         and cuenta_id = p_cuenta_id;
+         and cuentaid = p_cuentaid;
 
       -- Paso 2: Contar atributos definidos para la cuenta
       select count(*)
         into v_total_atributos
         from atributo
-       where cuenta_id = p_cuenta_id;
+       where cuentaid = p_cuentaid;
 
       -- Paso 3: Contar atributos asignados al producto en ATRIBUTO_PRODUCTO
       select count(distinct atributo_codigo)
         into v_atributos_asignados
         from atributo_producto
        where producto_gtin = p_producto_gtin
-         and producto_cuenta_id = p_cuenta_id;
+         and producto_cuentaid = p_cuentaid;
 
       -- Paso 4: Comparar y devolver resultado lógico
       if v_total_atributos = v_atributos_asignados then
@@ -1109,13 +1110,13 @@ create or replace package body pkg_admin_productos is
 
    -- 4. FUNCION F_NUM_CATEGORIAS_CUENTA
    function f_num_categorias_cuenta (
-      p_cuenta_id in cuenta.id%type
+      p_cuentaid in cuenta.id%type
    ) return number is
       v_total number;
       v_dummy number;
    begin
       -- Paso 0: Verificar que el usuario conectado tiene acceso a esta cuenta
-      if not f_verificar_cuenta_usuario(p_cuenta_id) then
+      if not f_verificar_cuenta_usuario(p_cuentaid) then
          raise_application_error(
             -20001,
             'Acceso denegado: esta cuenta no pertenece al usuario.'
@@ -1126,13 +1127,13 @@ create or replace package body pkg_admin_productos is
       select 1
         into v_dummy
         from cuenta
-       where id = p_cuenta_id;
+       where id = p_cuentaid;
 
       -- Paso 2: Contar las categorías asociadas a la cuenta
       select count(*)
         into v_total
         from categoria
-       where cuenta_id = p_cuenta_id;
+       where cuentaid = p_cuentaid;
 
       return v_total;
    exception
@@ -1158,13 +1159,13 @@ create or replace package body pkg_admin_productos is
    --5. PROCEDURE P_ACTUALIZAR_NOMBRE_PRODUCTO
    procedure p_actualizar_nombre_producto (
       p_producto_gtin in producto.gtin%type,
-      p_cuenta_id     in producto.cuenta_id%type,
+      p_cuentaid     in producto.cuentaid%type,
       p_nuevo_nombre  in producto.nombre%type
    ) is
       v_dummy number;
    begin
       -- Paso 0: Verificar que el usuario tiene acceso a la cuenta
-      if not f_verificar_cuenta_usuario(p_cuenta_id) then
+      if not f_verificar_cuenta_usuario(p_cuentaid) then
          raise_application_error(
             -20001,
             'Acceso denegado: esta cuenta no pertenece al usuario.'
@@ -1186,14 +1187,14 @@ create or replace package body pkg_admin_productos is
         into v_dummy
         from producto
        where gtin = p_producto_gtin
-         and cuenta_id = p_cuenta_id;
+         and cuentaid = p_cuentaid;
 
       -- Paso 3: Actualizar el nombre del producto
       update producto
          set
          nombre = p_nuevo_nombre
        where gtin = p_producto_gtin
-         and cuenta_id = p_cuenta_id;
+         and cuentaid = p_cuentaid;
 
       dbms_output.put_line('Nombre del producto actualizado correctamente.');
    exception
@@ -1223,15 +1224,15 @@ create or replace package body pkg_admin_productos is
 
    procedure p_asociar_activo_a_producto (
       p_producto_gtin      in producto.gtin%type,
-      p_producto_cuenta_id in producto.cuenta_id%type,
+      p_producto_cuentaid in producto.cuentaid%type,
       p_activo_id          in activos.id%type,
-      p_activo_cuenta_id   in activos.cuenta_id%type
+      p_activo_cuentaid   in activos.cuentaid%type
    ) is
       v_dummy number;
    begin
       -- Paso 0: Verificar que el usuario tiene acceso a ambas cuentas
-      if not f_verificar_cuenta_usuario(p_producto_cuenta_id)
-      or not f_verificar_cuenta_usuario(p_activo_cuenta_id) then
+      if not f_verificar_cuenta_usuario(p_producto_cuentaid)
+      or not f_verificar_cuenta_usuario(p_activo_cuentaid) then
          raise_application_error(
             -20001,
             'Acceso denegado: una o ambas cuentas no pertenecen al usuario.'
@@ -1244,7 +1245,7 @@ create or replace package body pkg_admin_productos is
            into v_dummy
            from producto
           where gtin = p_producto_gtin
-            and cuenta_id = p_producto_cuenta_id;
+            and cuentaid = p_producto_cuentaid;
       exception
          when no_data_found then
             insert into traza values ( sysdate,
@@ -1260,7 +1261,7 @@ create or replace package body pkg_admin_productos is
            into v_dummy
            from activos
           where id = p_activo_id
-            and cuenta_id = p_activo_cuenta_id;
+            and cuentaid = p_activo_cuentaid;
       exception
          when no_data_found then
             insert into traza values ( sysdate,
@@ -1276,9 +1277,9 @@ create or replace package body pkg_admin_productos is
            into v_dummy
            from act_pro
           where producto_gtin = p_producto_gtin
-            and producto_cuenta_id = p_producto_cuenta_id
+            and producto_cuentaid = p_producto_cuentaid
             and activo_id = p_activo_id
-            and activo_cuenta_id = p_activo_cuenta_id;
+            and activo_cuentaid = p_activo_cuentaid;
 
          -- Si llega aquí es porque ya existe la asociación
          insert into traza values ( sysdate,
@@ -1294,13 +1295,13 @@ create or replace package body pkg_admin_productos is
       -- Paso 4: Crear la nueva asociación
       insert into act_pro (
          producto_gtin,
-         producto_cuenta_id,
+         producto_cuentaid,
          activo_id,
-         activo_cuenta_id
+         activo_cuentaid
       ) values ( p_producto_gtin,
-                 p_producto_cuenta_id,
+                 p_producto_cuentaid,
                  p_activo_id,
-                 p_activo_cuenta_id );
+                 p_activo_cuentaid );
 
       dbms_output.put_line('Asociación producto-activo creada correctamente.');
    exception
@@ -1322,12 +1323,12 @@ create or replace package body pkg_admin_productos is
    --7. PROCEDURE P_ELIMINAR_PRODUCTO_Y_ASOCIACIONES
    procedure p_eliminar_producto_y_asociaciones (
       p_producto_gtin in producto.gtin%type,
-      p_cuenta_id     in producto.cuenta_id%type
+      p_cuentaid     in producto.cuentaid%type
    ) is
       v_dummy number;
    begin
       -- Paso 0: Verificar acceso del usuario a la cuenta
-      if not f_verificar_cuenta_usuario(p_cuenta_id) then
+      if not f_verificar_cuenta_usuario(p_cuentaid) then
          raise_application_error(
             -20001,
             'Acceso denegado: esta cuenta no pertenece al usuario.'
@@ -1339,36 +1340,36 @@ create or replace package body pkg_admin_productos is
         into v_dummy
         from producto
        where gtin = p_producto_gtin
-         and cuenta_id = p_cuenta_id;
+         and cuentaid = p_cuentaid;
 
       -- Paso 2: Iniciar bloque transaccional
       begin
          -- Eliminar relaciones de la tabla ACT_PRO
          delete from act_pro
           where producto_gtin = p_producto_gtin
-            and producto_cuenta_id = p_cuenta_id;
+            and producto_cuentaid = p_cuentaid;
 
          -- Eliminar valores de la tabla ATRIBUTO_PRODUCTO
          delete from atributo_producto
           where producto_gtin = p_producto_gtin
-            and producto_cuenta_id = p_cuenta_id;
+            and producto_cuentaid = p_cuentaid;
 
          -- Eliminar asociaciones de categoría en PROD_CAT
          delete from prod_cat
           where producto_gtin = p_producto_gtin
-            and producto_cuenta_id = p_cuenta_id;
+            and producto_cuentaid = p_cuentaid;
 
          -- Eliminar relaciones en la tabla RELACIONADO
          delete from relacionado
           where ( producto1_gtin = p_producto_gtin
-            and producto1_cuenta_id = p_cuenta_id )
+            and producto1_cuentaid = p_cuentaid )
              or ( producto2_gtin = p_producto_gtin
-            and producto2_cuenta_id = p_cuenta_id );
+            and producto2_cuentaid = p_cuentaid );
 
          -- Finalmente, eliminar el producto
          delete from producto
           where gtin = p_producto_gtin
-            and cuenta_id = p_cuenta_id;
+            and cuentaid = p_cuentaid;
 
          dbms_output.put_line('Producto y todas sus asociaciones eliminados correctamente.');
       exception
@@ -1404,13 +1405,13 @@ create or replace package body pkg_admin_productos is
 
    --8.  PROCEDURE P_ACTUALIZAR_PRODUCTOS
    procedure p_actualizar_productos (
-      p_cuenta_id in cuenta.id%type
+      p_cuentaid in cuenta.id%type
    ) is
       cursor c_ext is
       select gtin,
              nombre
         from productos_ext
-       where cuenta_id = p_cuenta_id;
+       where cuentaid = p_cuentaid;
 
       v_gtin          producto.gtin%type;
       v_nombre        producto.nombre%type;
@@ -1418,14 +1419,14 @@ create or replace package body pkg_admin_productos is
       cursor c_internos is
       select gtin
         from producto
-       where cuenta_id = p_cuenta_id;
+       where cuentaid = p_cuentaid;
 
       type t_gtns is
          table of producto.gtin%type index by varchar2(40);
       tabla_ext_gtns  t_gtns;
    begin
       -- Paso 0: Verificar que el usuario tiene acceso a esta cuenta
-      if not f_verificar_cuenta_usuario(p_cuenta_id) then
+      if not f_verificar_cuenta_usuario(p_cuentaid) then
          raise_application_error(
             -20001,
             'Acceso denegado: esta cuenta no pertenece al usuario.'
@@ -1440,13 +1441,13 @@ create or replace package body pkg_admin_productos is
               into v_nombre_actual
               from producto
              where gtin = r.gtin
-               and cuenta_id = p_cuenta_id;
+               and cuentaid = p_cuentaid;
 
             -- Si el nombre ha cambiado, se actualiza
             if v_nombre_actual != r.nombre then
                p_actualizar_nombre_producto(
                   r.gtin,
-                  p_cuenta_id,
+                  p_cuentaid,
                   r.nombre
                );
             end if;
@@ -1457,10 +1458,10 @@ create or replace package body pkg_admin_productos is
                insert into producto (
                   gtin,
                   nombre,
-                  cuenta_id
+                  cuentaid
                ) values ( r.gtin,
                           r.nombre,
-                          p_cuenta_id );
+                          p_cuentaid );
 
                dbms_output.put_line('Producto nuevo insertado desde PRODUCTOS_EXT: ' || r.gtin);
          end;
@@ -1474,7 +1475,7 @@ create or replace package body pkg_admin_productos is
          if not tabla_ext_gtns.exists(r.gtin) then
             p_eliminar_producto_y_asociaciones(
                r.gtin,
-               p_cuenta_id
+               p_cuentaid
             );
             dbms_output.put_line('Producto eliminado por no estar en PRODUCTOS_EXT: ' || r.gtin);
          end if;
@@ -1502,12 +1503,12 @@ create or replace package body pkg_admin_productos is
       -- Paso 1: Insertar en la tabla USUARIO
       insert into usuario (
          nombre_usuario,
-         cuenta_id,
+         cuentaid,
          nombre_completo,
          email,
          telefono
       ) values ( p_usuario.nombre_usuario,
-                 p_usuario.cuenta_id,
+                 p_usuario.cuentaid,
                  p_usuario.nombre_completo,
                  p_usuario.email,
                  p_usuario.telefono );
