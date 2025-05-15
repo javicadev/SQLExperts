@@ -1254,46 +1254,73 @@ EXCEPTION
     RAISE;
 END;
 
---P8: P_ACTUALIZAR_PRODUCTOS
--- Revisa PRODUCTOS_EXT y sincroniza con PRODUCTO: añade nuevos, actualiza nombres, elimina obsoletos.
--- Parámetro:
---   p_cuentaid: ID de la cuenta.
+-- P8: Sincroniza la tabla PRODUCTO con PRODUCTOS_EXT según la cuenta
+-- Añade nuevos productos, actualiza nombres y elimina los que ya no existen.
+
 PROCEDURE p_actualizar_productos (
   p_cuentaid IN cuenta.id%TYPE
 ) IS
+  -- Cursor para obtener los productos externos de la cuenta
   CURSOR c_ext IS
     SELECT gtin, nombre FROM productos_ext WHERE cuentaid = p_cuentaid;
+
+  -- Cursor para obtener los productos internos actuales de la cuenta
   CURSOR c_int IS
     SELECT gtin FROM producto WHERE cuentaid = p_cuentaid;
 
+  -- Variable para comparar nombres
   v_nombre_actual producto.nombre%TYPE;
 
-  TYPE t_gtins IS TABLE OF BOOLEAN INDEX BY PLS_INTEGER;
+  -- Tabla PL/SQL para registrar los GTINs vistos en productos_ext
+  TYPE t_gtins IS TABLE OF BOOLEAN INDEX BY BINARY_INTEGER;
   tabla_ext t_gtins;
+
 BEGIN
-  -- Paso 0: Verificar acceso
+  -- Paso 0: Verificar acceso del usuario
   IF NOT f_verificar_cuenta_usuario(p_cuentaid) THEN
     RAISE_APPLICATION_ERROR(-20001, 'Acceso denegado');
   END IF;
 
-  -- Paso 1: Recorrer productos externos
+  -- Paso 1: Recorrer productos externos y sincronizar
   FOR r IN c_ext LOOP
     BEGIN
+      -- Paso 1.1: Ver si el producto ya existe
       SELECT nombre INTO v_nombre_actual
       FROM producto
       WHERE gtin = r.gtin AND cuentaid = p_cuentaid;
 
+      -- Paso 1.2: Si el nombre ha cambiado, actualizarlo
       IF v_nombre_actual != r.nombre THEN
         p_actualizar_nombre_producto(r.gtin, p_cuentaid, r.nombre);
       END IF;
+
     EXCEPTION
+      -- Paso 1.3: Si no existe el producto, insertarlo
       WHEN NO_DATA_FOUND THEN
         INSERT INTO producto (gtin, nombre, cuentaid)
         VALUES (r.gtin, r.nombre, p_cuentaid);
     END;
 
+    -- Paso 1.4: Registrar que ese GTIN existe en productos_ext
     tabla_ext(r.gtin) := TRUE;
   END LOOP;
+
+  -- Paso 2: Recorrer productos internos y eliminar los que no están en productos_ext
+  FOR r IN c_int LOOP
+    IF NOT tabla_ext.EXISTS(r.gtin) THEN
+      p_eliminar_producto_y_asociaciones(r.gtin, p_cuentaid);
+    END IF;
+  END LOOP;
+
+EXCEPTION
+  -- Manejo general de errores
+  WHEN OTHERS THEN
+    INSERT INTO traza VALUES (
+      SYSDATE, USER, $$PLSQL_UNIT,
+      SQLCODE || ' ' || SQLERRM
+    );
+    RAISE;
+END p_actualizar_productos;
 
   -- Paso 2: Eliminar productos que ya no están
   FOR r IN c_int LOOP
