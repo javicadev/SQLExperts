@@ -115,12 +115,14 @@ CREATE OR REPLACE PACKAGE BODY pkg_admin_productos IS
 
   EXCEPTION
     WHEN NO_DATA_FOUND THEN
-      INSERT INTO traza VALUES (SYSDATE, USER, $$PLSQL_UNIT, 'Usuario no pertenece a la cuenta.');
+      INSERT INTO traza VALUES (SYSDATE, USER, $$PLSQL_UNIT, 'El usuario no pertenece a la cuenta indicada.');
       RETURN FALSE;
 
     WHEN OTHERS THEN
-      INSERT INTO traza VALUES (SYSDATE, USER, $$PLSQL_UNIT,
-        SUBSTR(SQLCODE || ' ' || SQLERRM, 1, 500));
+      INSERT INTO traza VALUES (
+        SYSDATE, USER, $$PLSQL_UNIT,
+        SUBSTR(SQLCODE || ' ' || SQLERRM, 1, 500)
+      );
       RETURN FALSE;
   END f_verificar_cuenta_usuario;
 
@@ -130,15 +132,16 @@ CREATE OR REPLACE PACKAGE BODY pkg_admin_productos IS
   FUNCTION f_obtener_plan_cuenta (
     p_cuenta_id IN cuenta.id%TYPE
   ) RETURN plan%ROWTYPE IS
-    v_plan     plan%ROWTYPE;
-    v_mensaje  VARCHAR2(500);
+    v_plan    plan%ROWTYPE;
+    v_mensaje VARCHAR2(500);
   BEGIN
     IF NOT f_verificar_cuenta_usuario(p_cuenta_id) THEN
       RAISE_APPLICATION_ERROR(-20001, 'Acceso no autorizado a la cuenta.');
     END IF;
 
-    SELECT id, productos, activos, almacenamiento, categoriasproducto,
-           categoriasactivos, relaciones, precioanual, nombre
+    SELECT p.id, p.productos, p.activos, p.almacenamiento,
+           p.categoriasproducto, p.categoriasactivos,
+           p.relaciones, p.precioanual, p.nombre
     INTO v_plan
     FROM cuenta c
     JOIN plan p ON c.planid = p.id
@@ -153,8 +156,7 @@ CREATE OR REPLACE PACKAGE BODY pkg_admin_productos IS
       RAISE;
 
     WHEN exception_plan_no_asignado THEN
-      INSERT INTO traza VALUES (SYSDATE, USER, $$PLSQL_UNIT,
-        'La cuenta no tiene plan asignado');
+      INSERT INTO traza VALUES (SYSDATE, USER, $$PLSQL_UNIT, 'La cuenta no tiene plan asignado');
       RAISE;
 
     WHEN OTHERS THEN
@@ -189,8 +191,10 @@ CREATE OR REPLACE PACKAGE BODY pkg_admin_productos IS
       RAISE;
 
     WHEN OTHERS THEN
-      INSERT INTO traza VALUES (SYSDATE, USER, $$PLSQL_UNIT,
-        SUBSTR(SQLCODE || ' ' || SQLERRM, 1, 500));
+      INSERT INTO traza VALUES (
+        SYSDATE, USER, $$PLSQL_UNIT,
+        SUBSTR(SQLCODE || ' ' || SQLERRM, 1, 500)
+      );
       RAISE;
   END f_contar_productos_cuenta;
 
@@ -207,11 +211,9 @@ CREATE OR REPLACE PACKAGE BODY pkg_admin_productos IS
       RAISE_APPLICATION_ERROR(-20001, 'Acceso no autorizado a la cuenta.');
     END IF;
 
-    -- Verificamos que el producto exista
-    DECLARE
-      v_dummy NUMBER;
     BEGIN
-      SELECT 1 INTO v_dummy
+      SELECT 1
+      INTO v_faltan
       FROM producto
       WHERE gtin = p_producto_gtin AND cuentaid = p_cuenta_id;
     EXCEPTION
@@ -220,13 +222,13 @@ CREATE OR REPLACE PACKAGE BODY pkg_admin_productos IS
         RAISE;
     END;
 
-    -- Comprobamos que todos los atributos están cubiertos
     SELECT COUNT(*)
     INTO v_faltan
     FROM atributo a
     WHERE a.cuentaid = p_cuenta_id
       AND NOT EXISTS (
-        SELECT 1 FROM atributosproducto ap
+        SELECT 1
+        FROM atributosproducto ap
         WHERE ap.atributoid = a.id
           AND ap.productogtin = p_producto_gtin
           AND ap.productocuentaid = p_cuenta_id
@@ -236,8 +238,10 @@ CREATE OR REPLACE PACKAGE BODY pkg_admin_productos IS
 
   EXCEPTION
     WHEN OTHERS THEN
-      INSERT INTO traza VALUES (SYSDATE, USER, $$PLSQL_UNIT,
-        SUBSTR(SQLCODE || ' ' || SQLERRM, 1, 500));
+      INSERT INTO traza VALUES (
+        SYSDATE, USER, $$PLSQL_UNIT,
+        SUBSTR(SQLCODE || ' ' || SQLERRM, 1, 500)
+      );
       RAISE;
   END f_validar_atributos_producto;
 
@@ -266,11 +270,12 @@ CREATE OR REPLACE PACKAGE BODY pkg_admin_productos IS
       RAISE;
 
     WHEN OTHERS THEN
-      INSERT INTO traza VALUES (SYSDATE, USER, $$PLSQL_UNIT,
-        SUBSTR(SQLCODE || ' ' || SQLERRM, 1, 500));
+      INSERT INTO traza VALUES (
+        SYSDATE, USER, $$PLSQL_UNIT,
+        SUBSTR(SQLCODE || ' ' || SQLERRM, 1, 500)
+      );
       RAISE;
   END f_num_categorias_cuenta;
-
   ---------------------------------------------------------------------------
   -- PROCEDIMIENTO 5: p_actualizar_nombre_producto
   ---------------------------------------------------------------------------
@@ -326,24 +331,27 @@ CREATE OR REPLACE PACKAGE BODY pkg_admin_productos IS
       RAISE_APPLICATION_ERROR(-20001, 'Acceso no autorizado a la cuenta.');
     END IF;
 
-    -- Verificar existencia del producto y activo
     SELECT 1 INTO v_dummy FROM producto WHERE gtin = p_producto_gtin AND cuentaid = p_producto_cuenta_id;
     SELECT 1 INTO v_dummy FROM activo WHERE id = p_activo_id AND cuentaid = p_activo_cuenta_id;
 
-    -- Comprobar si ya existe la relación
-    SELECT 1 INTO v_dummy
-    FROM relacionproductoactivo
-    WHERE productogtin = p_producto_gtin AND productocuentaid = p_producto_cuenta_id
-      AND activoid = p_activo_id AND activocuentaid = p_activo_cuenta_id;
+    BEGIN
+      SELECT 1 INTO v_dummy
+      FROM relacionproductoactivo
+      WHERE productogtin = p_producto_gtin AND productocuentaid = p_producto_cuenta_id
+        AND activoid = p_activo_id AND activocuentaid = p_activo_cuenta_id;
 
-    -- Si no lanza excepción, ya existe
-    RAISE exception_asociacion_duplicada;
+      -- Si llega aquí, ya existe
+      RAISE exception_asociacion_duplicada;
+
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        INSERT INTO relacionproductoactivo VALUES (
+          p_activo_id, p_activo_cuenta_id,
+          p_producto_gtin, p_producto_cuenta_id
+        );
+    END;
 
   EXCEPTION
-    WHEN NO_DATA_FOUND THEN
-      INSERT INTO traza VALUES (SYSDATE, USER, $$PLSQL_UNIT, 'Producto o activo no encontrado.');
-      RAISE;
-
     WHEN exception_asociacion_duplicada THEN
       INSERT INTO traza VALUES (SYSDATE, USER, $$PLSQL_UNIT, 'Asociación ya existente.');
       RAISE;
@@ -407,7 +415,7 @@ CREATE OR REPLACE PACKAGE BODY pkg_admin_productos IS
     END IF;
 
     FOR r IN (
-      SELECT pe.* FROM productos_ext pe
+      SELECT * FROM productos_ext pe
       WHERE pe.cuentaid = p_cuenta_id
     ) LOOP
       BEGIN
@@ -416,8 +424,11 @@ CREATE OR REPLACE PACKAGE BODY pkg_admin_productos IS
         WHERE sku = r.sku AND cuentaid = r.cuentaid;
 
         IF SQL%ROWCOUNT = 0 THEN
-          INSERT INTO producto (gtin, sku, nombre, textocorto, creado, cuentaid)
-          VALUES (producto_seq.NEXTVAL, r.sku, r.nombre, r.textocorto, r.creado, r.cuentaid);
+          INSERT INTO producto (
+            gtin, sku, nombre, textocorto, creado, cuentaid
+          ) VALUES (
+            seq_productos.NEXTVAL, r.sku, r.nombre, r.textocorto, r.creado, r.cuentaid
+          );
         END IF;
 
       EXCEPTION
@@ -436,13 +447,17 @@ CREATE OR REPLACE PACKAGE BODY pkg_admin_productos IS
     p_password  IN VARCHAR2
   ) IS
   BEGIN
-    EXECUTE IMMEDIATE 'CREATE USER ' || p_usuario.nombreusuario || ' IDENTIFIED BY ' || p_password;
-    EXECUTE IMMEDIATE 'GRANT CONNECT TO ' || p_usuario.nombreusuario;
-    EXECUTE IMMEDIATE 'GRANT ' || p_rol || ' TO ' || p_usuario.nombreusuario;
+    EXECUTE IMMEDIATE 'CREATE USER "' || p_usuario.nombreusuario || '" IDENTIFIED BY "' || p_password || '"';
+    EXECUTE IMMEDIATE 'GRANT CONNECT TO "' || p_usuario.nombreusuario || '"';
+    EXECUTE IMMEDIATE 'GRANT ' || p_rol || ' TO "' || p_usuario.nombreusuario || '"';
 
-    INSERT INTO usuario (id, nombreusuario, nombrecompleto, avatar, correoelectronico, telefono, cuentaid, cuentadueno)
-    VALUES (p_usuario.id, p_usuario.nombreusuario, p_usuario.nombrecompleto, p_usuario.avatar,
-            p_usuario.correoelectronico, p_usuario.telefono, p_usuario.cuentaid, p_usuario.cuentadueno);
+    INSERT INTO usuario (
+      id, nombreusuario, nombrecompleto, avatar,
+      correoelectronico, telefono, cuentaid, cuentadueno
+    ) VALUES (
+      p_usuario.id, p_usuario.nombreusuario, p_usuario.nombrecompleto, p_usuario.avatar,
+      p_usuario.correoelectronico, p_usuario.telefono, p_usuario.cuentaid, p_usuario.cuentadueno
+    );
 
   EXCEPTION
     WHEN OTHERS THEN
