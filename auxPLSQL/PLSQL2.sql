@@ -1,5 +1,13 @@
 -- PAQUETE FUNCIONES AVANZADAS ---
 --SI COMPILAN--
+
+
+-----------------
+--RECORDAR EXCEPCIONESSSSS!!! DECLARACCION EN EL PAQUETE, para probar podemos declararla en la misma funcion
+-----------------------------
+
+--F1:: f_validar_plan_suficiente
+
 CREATE OR REPLACE FUNCTION f_validar_plan_suficiente (
   p_cuenta_id IN cuenta.id%TYPE
 ) RETURN VARCHAR2 IS
@@ -121,3 +129,47 @@ EXCEPTION
     RAISE;
 END;
 /
+
+--F2: f_lista_categorias_producto
+
+CREATE OR REPLACE FUNCTION f_lista_categorias_producto (
+  p_producto_gtin IN producto.gtin%TYPE,
+  p_cuenta_id     IN producto.cuentaid%TYPE
+) RETURN VARCHAR2 IS
+  v_lista   VARCHAR2(1000);
+  v_mensaje VARCHAR2(500);
+BEGIN
+  -- Verificar acceso
+  IF NOT f_verificar_cuenta_usuario(p_cuenta_id) THEN
+    RAISE_APPLICATION_ERROR(-20001, 'Acceso no autorizado.');
+  END IF;
+
+  -- Obtener lista de categorías
+  SELECT LISTAGG(c.nombre, ', ')
+         WITHIN GROUP (ORDER BY c.nombre)
+  INTO v_lista
+  FROM relacionproductocategoria rpc
+  JOIN categoria c
+    ON rpc.categoriaid = c.id AND rpc.categoriacuentaid = c.cuentaid
+  WHERE rpc.productogtin = p_producto_gtin
+    AND rpc.productocuentaid = p_cuenta_id;
+
+  RETURN NVL(v_lista, '');
+
+EXCEPTION
+  WHEN NO_DATA_FOUND THEN
+    RETURN ''; -- Producto sin categorías
+
+  WHEN OTHERS THEN
+    v_mensaje := SUBSTR(SQLCODE || ' ' || SQLERRM, 1, 500);
+    INSERT INTO traza VALUES (
+      SYSDATE,
+      SYS_CONTEXT('USERENV','SESSION_USER'),
+      'f_lista_categorias_producto',
+      v_mensaje
+    );
+    RAISE;
+END;
+/
+
+--F3:
