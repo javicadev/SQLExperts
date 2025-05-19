@@ -284,3 +284,41 @@ EXCEPTION
 END;
 /
 
+--JOBS
+BEGIN
+  DBMS_SCHEDULER.CREATE_JOB (
+    job_name        => 'J_LIMPIA_TRAZA',
+    job_type        => 'PLSQL_BLOCK',
+    job_action      => '
+      BEGIN
+        DELETE FROM traza
+        WHERE fecha < SYSDATE - (1/1440);  -- 1 minuto para pruebas
+        COMMIT;
+      END;',
+    start_date      => SYSTIMESTAMP,
+    repeat_interval => 'FREQ=MINUTELY;INTERVAL=2',
+    enabled         => TRUE,
+    comments        => 'Limpia entradas de TRAZA de más de 1 minuto (simula 1 año para pruebas)'
+  );
+END;
+/
+
+BEGIN
+  DBMS_SCHEDULER.CREATE_JOB (
+    job_name        => 'J_ACTUALIZA_PRODUCTOS',
+    job_type        => 'PLSQL_BLOCK',
+    job_action      => '
+      DECLARE
+        CURSOR c_cuentas IS SELECT id FROM cuenta;
+      BEGIN
+        FOR r IN c_cuentas LOOP
+          pkg_admin_productos.p_actualizar_productos(r.id);
+        END LOOP;
+      END;',
+    start_date      => SYSTIMESTAMP,
+    repeat_interval => 'FREQ=DAILY;BYHOUR=1;BYMINUTE=0;BYSECOND=0',
+    enabled         => TRUE,
+    comments        => 'Actualiza productos desde productos_ext para todas las cuentas cada noche'
+  );
+END;
+/
