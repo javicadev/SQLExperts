@@ -37,22 +37,52 @@ exception
       dbms_output.put_line('Error al registrar prueba: ' || sqlerrm);
 end;
 
--- =============================================
--- BATERÍA DE PRUEBAS
--- =============================================
+-- ================================================================
+-- BATERÍA DE PRUEBAS COMPLETA PARA PKG_ADMIN_PRODUCTOS
+-- Esta batería usa la infraestructura:
+--   - Tabla: RESULTADOS_PRUEBAS
+--   - Procedimiento: REGISTRAR_PRUEBA
+-- Cada prueba sigue la estructura:
+--   - BEGIN ... END
+--   - registrar_prueba('nombre_prueba', 'ÉXITO'/'ERROR', 'detalle')
+-- ================================================================
 
--- =============================================
--- BATERÍA DE PRUEBAS EXTENDIDA - pkg_admin_productos
--- Fecha de generación: 2025-05-17 08:24:54
--- Esta batería prueba cada función y procedimiento
--- con distintos escenarios: casos válidos, inválidos y errores previstos.
--- =============================================
 
--- =============================================
+-- ================================================================
+-- FUNCIÓN: f_verificar_cuenta_usuario
+-- ================================================================
+
+-- Caso 1: Usuario pertenece a la cuenta
+BEGIN
+  IF pkg_admin_productos.f_verificar_cuenta_usuario(1) THEN
+    registrar_prueba('f_verificar_cuenta_usuario (válido)', 'ÉXITO', 'Usuario tiene acceso');
+  ELSE
+    registrar_prueba('f_verificar_cuenta_usuario (válido)', 'ERROR', 'Usuario no tiene acceso');
+  END IF;
+EXCEPTION
+  WHEN OTHERS THEN
+    registrar_prueba('f_verificar_cuenta_usuario (válido)', 'ERROR', SQLERRM);
+END;
+/
+
+-- Caso 2: Usuario no pertenece a la cuenta
+BEGIN
+  IF pkg_admin_productos.f_verificar_cuenta_usuario(9999) THEN
+    registrar_prueba('f_verificar_cuenta_usuario (inválido)', 'ERROR', 'Acceso concedido incorrectamente');
+  ELSE
+    registrar_prueba('f_verificar_cuenta_usuario (inválido)', 'ÉXITO', 'Acceso correctamente denegado');
+  END IF;
+EXCEPTION
+  WHEN OTHERS THEN
+    registrar_prueba('f_verificar_cuenta_usuario (inválido)', 'ERROR', SQLERRM);
+END;
+/
+
+-- ================================================================
 -- FUNCIÓN: f_obtener_plan_cuenta
--- =============================================
+-- ================================================================
 
--- Caso 1: Cuenta válida
+-- Caso 1: Cuenta válida con plan
 BEGIN
   DECLARE v_plan plan%ROWTYPE;
   BEGIN
@@ -65,12 +95,12 @@ BEGIN
 END;
 /
 
--- Caso 2: Cuenta inexistente
+-- Caso 2: Cuenta no existente
 BEGIN
   DECLARE v_plan plan%ROWTYPE;
   BEGIN
     v_plan := pkg_admin_productos.f_obtener_plan_cuenta(9999);
-    registrar_prueba('f_obtener_plan_cuenta (inexistente)', 'ÉXITO', 'Plan ID: ' || v_plan.id);
+    registrar_prueba('f_obtener_plan_cuenta (inexistente)', 'ÉXITO', 'No se esperaba plan');
   EXCEPTION
     WHEN OTHERS THEN
       registrar_prueba('f_obtener_plan_cuenta (inexistente)', 'ERROR', SQLERRM);
@@ -78,9 +108,9 @@ BEGIN
 END;
 /
 
--- =============================================
+-- ================================================================
 -- FUNCIÓN: f_contar_productos_cuenta
--- =============================================
+-- ================================================================
 
 -- Caso 1: Cuenta con productos
 BEGIN
@@ -108,15 +138,76 @@ BEGIN
 END;
 /
 
--- =============================================
+
+-- ================================================================
+-- FUNCIÓN: f_validar_atributos_producto
+-- ================================================================
+
+-- Caso 1: Producto con todos los atributos válidos
+BEGIN
+  DECLARE v_ok BOOLEAN;
+  BEGIN
+    v_ok := pkg_admin_productos.f_validar_atributos_producto(101, 1);
+    registrar_prueba('f_validar_atributos_producto (completo)', 'ÉXITO', 'Resultado: ' || CASE WHEN v_ok THEN 'TRUE' ELSE 'FALSE' END);
+  EXCEPTION
+    WHEN OTHERS THEN
+      registrar_prueba('f_validar_atributos_producto (completo)', 'ERROR', SQLERRM);
+  END;
+END;
+/
+
+-- Caso 2: Producto incompleto o inexistente
+BEGIN
+  DECLARE v_ok BOOLEAN;
+  BEGIN
+    v_ok := pkg_admin_productos.f_validar_atributos_producto(9999, 1);
+    registrar_prueba('f_validar_atributos_producto (no existe)', 'ÉXITO', 'Resultado: ' || CASE WHEN v_ok THEN 'TRUE' ELSE 'FALSE' END);
+  EXCEPTION
+    WHEN OTHERS THEN
+      registrar_prueba('f_validar_atributos_producto (no existe)', 'ERROR', SQLERRM);
+  END;
+END;
+/
+
+-- ================================================================
+-- FUNCIÓN: f_num_categorias_cuenta
+-- ================================================================
+
+-- Caso 1: Cuenta con categorías
+BEGIN
+  DECLARE v_cat NUMBER;
+  BEGIN
+    v_cat := pkg_admin_productos.f_num_categorias_cuenta(1);
+    registrar_prueba('f_num_categorias_cuenta (con categorías)', 'ÉXITO', 'Total: ' || v_cat);
+  EXCEPTION
+    WHEN OTHERS THEN
+      registrar_prueba('f_num_categorias_cuenta (con categorías)', 'ERROR', SQLERRM);
+  END;
+END;
+/
+
+-- Caso 2: Cuenta sin categorías
+BEGIN
+  DECLARE v_cat NUMBER;
+  BEGIN
+    v_cat := pkg_admin_productos.f_num_categorias_cuenta(9999);
+    registrar_prueba('f_num_categorias_cuenta (sin categorías)', 'ÉXITO', 'Total: ' || v_cat);
+  EXCEPTION
+    WHEN OTHERS THEN
+      registrar_prueba('f_num_categorias_cuenta (sin categorías)', 'ERROR', SQLERRM);
+  END;
+END;
+/
+
+-- ================================================================
 -- PROCEDIMIENTO: p_actualizar_nombre_producto
--- =============================================
+-- ================================================================
 
 -- Caso 1: Actualización válida
 BEGIN
   BEGIN
-    pkg_admin_productos.p_actualizar_nombre_producto(101, 1, 'Nuevo Nombre');
-    registrar_prueba('p_actualizar_nombre_producto (válido)', 'ÉXITO', 'Nombre actualizado');
+    pkg_admin_productos.p_actualizar_nombre_producto(101, 1, 'Nombre Actualizado');
+    registrar_prueba('p_actualizar_nombre_producto (válido)', 'ÉXITO', 'Nombre actualizado correctamente');
   EXCEPTION
     WHEN OTHERS THEN
       registrar_prueba('p_actualizar_nombre_producto (válido)', 'ERROR', SQLERRM);
@@ -128,7 +219,7 @@ END;
 BEGIN
   BEGIN
     pkg_admin_productos.p_actualizar_nombre_producto(101, 1, NULL);
-    registrar_prueba('p_actualizar_nombre_producto (nulo)', 'ÉXITO', 'Se permitió nombre NULL');
+    registrar_prueba('p_actualizar_nombre_producto (nulo)', 'ÉXITO', 'Se intentó actualizar con NULL');
   EXCEPTION
     WHEN OTHERS THEN
       registrar_prueba('p_actualizar_nombre_producto (nulo)', 'ERROR', SQLERRM);
@@ -136,76 +227,15 @@ BEGIN
 END;
 /
 
--- =============================================
--- FUNCIÓN: f_validar_atributos_producto
--- =============================================
-
--- Caso 1: Producto completo
-BEGIN
-  DECLARE v_valido BOOLEAN;
-  BEGIN
-    v_valido := pkg_admin_productos.f_validar_atributos_producto(101, 1);
-    registrar_prueba('f_validar_atributos_producto (completo)', 'ÉXITO', 'Resultado: ' || CASE WHEN v_valido THEN 'TRUE' ELSE 'FALSE' END);
-  EXCEPTION
-    WHEN OTHERS THEN
-      registrar_prueba('f_validar_atributos_producto (completo)', 'ERROR', SQLERRM);
-  END;
-END;
-/
-
--- Caso 2: Producto incompleto o inexistente
-BEGIN
-  DECLARE v_valido BOOLEAN;
-  BEGIN
-    v_valido := pkg_admin_productos.f_validar_atributos_producto(9999, 1);
-    registrar_prueba('f_validar_atributos_producto (no existe)', 'ÉXITO', 'Resultado: ' || CASE WHEN v_valido THEN 'TRUE' ELSE 'FALSE' END);
-  EXCEPTION
-    WHEN OTHERS THEN
-      registrar_prueba('f_validar_atributos_producto (no existe)', 'ERROR', SQLERRM);
-  END;
-END;
-/
-
-
--- =============================================
--- FUNCIÓN: f_num_categorias_cuenta
--- =============================================
-
--- Caso 1: Cuenta con categorías
-BEGIN
-  DECLARE v_total NUMBER;
-  BEGIN
-    v_total := pkg_admin_productos.f_num_categorias_cuenta(1);
-    registrar_prueba('f_num_categorias_cuenta (con categorías)', 'ÉXITO', 'Total: ' || v_total);
-  EXCEPTION
-    WHEN OTHERS THEN
-      registrar_prueba('f_num_categorias_cuenta (con categorías)', 'ERROR', SQLERRM);
-  END;
-END;
-/
-
--- Caso 2: Cuenta sin categorías
-BEGIN
-  DECLARE v_total NUMBER;
-  BEGIN
-    v_total := pkg_admin_productos.f_num_categorias_cuenta(9999);
-    registrar_prueba('f_num_categorias_cuenta (sin categorías)', 'ÉXITO', 'Total: ' || v_total);
-  EXCEPTION
-    WHEN OTHERS THEN
-      registrar_prueba('f_num_categorias_cuenta (sin categorías)', 'ERROR', SQLERRM);
-  END;
-END;
-/
-
--- =============================================
+-- ================================================================
 -- PROCEDIMIENTO: p_asociar_activo_a_producto
--- =============================================
+-- ================================================================
 
 -- Caso 1: Asociación válida
 BEGIN
   BEGIN
     pkg_admin_productos.p_asociar_activo_a_producto(101, 1, 501, 1);
-    registrar_prueba('p_asociar_activo_a_producto (válido)', 'ÉXITO', 'Asociación realizada');
+    registrar_prueba('p_asociar_activo_a_producto (válido)', 'ÉXITO', 'Activo asociado correctamente');
   EXCEPTION
     WHEN OTHERS THEN
       registrar_prueba('p_asociar_activo_a_producto (válido)', 'ERROR', SQLERRM);
@@ -213,11 +243,11 @@ BEGIN
 END;
 /
 
--- Caso 2: Asociación duplicada o fallida
+-- Caso 2: Asociación duplicada
 BEGIN
   BEGIN
     pkg_admin_productos.p_asociar_activo_a_producto(101, 1, 501, 1);
-    registrar_prueba('p_asociar_activo_a_producto (duplicada)', 'ÉXITO', 'Se permitió duplicado');
+    registrar_prueba('p_asociar_activo_a_producto (duplicada)', 'ÉXITO', 'Intento de duplicar asociación');
   EXCEPTION
     WHEN OTHERS THEN
       registrar_prueba('p_asociar_activo_a_producto (duplicada)', 'ERROR', SQLERRM);
@@ -225,15 +255,15 @@ BEGIN
 END;
 /
 
--- =============================================
+-- ================================================================
 -- PROCEDIMIENTO: p_eliminar_producto_y_asociaciones
--- =============================================
+-- ================================================================
 
 -- Caso 1: Producto existente
 BEGIN
   BEGIN
     pkg_admin_productos.p_eliminar_producto_y_asociaciones(101, 1);
-    registrar_prueba('p_eliminar_producto_y_asociaciones (existe)', 'ÉXITO', 'Producto eliminado');
+    registrar_prueba('p_eliminar_producto_y_asociaciones (existe)', 'ÉXITO', 'Producto y asociaciones eliminadas');
   EXCEPTION
     WHEN OTHERS THEN
       registrar_prueba('p_eliminar_producto_y_asociaciones (existe)', 'ERROR', SQLERRM);
@@ -241,11 +271,11 @@ BEGIN
 END;
 /
 
--- Caso 2: Producto no existente
+-- Caso 2: Producto inexistente
 BEGIN
   BEGIN
     pkg_admin_productos.p_eliminar_producto_y_asociaciones(9999, 1);
-    registrar_prueba('p_eliminar_producto_y_asociaciones (no existe)', 'ÉXITO', 'Intento de eliminación');
+    registrar_prueba('p_eliminar_producto_y_asociaciones (no existe)', 'ÉXITO', 'Producto no encontrado, controlado');
   EXCEPTION
     WHEN OTHERS THEN
       registrar_prueba('p_eliminar_producto_y_asociaciones (no existe)', 'ERROR', SQLERRM);
@@ -253,15 +283,14 @@ BEGIN
 END;
 /
 
--- =============================================
+-- ================================================================
 -- PROCEDIMIENTO: p_actualizar_productos
--- =============================================
+-- ================================================================
 
--- Caso único: Actualización desde productos_ext
 BEGIN
   BEGIN
     pkg_admin_productos.p_actualizar_productos(1);
-    registrar_prueba('p_actualizar_productos', 'ÉXITO', 'Sincronización completa');
+    registrar_prueba('p_actualizar_productos', 'ÉXITO', 'Productos sincronizados con productos_ext');
   EXCEPTION
     WHEN OTHERS THEN
       registrar_prueba('p_actualizar_productos', 'ERROR', SQLERRM);
@@ -269,19 +298,19 @@ BEGIN
 END;
 /
 
--- =============================================
+-- ================================================================
 -- PROCEDIMIENTO: p_crear_usuario
--- =============================================
+-- ================================================================
 
 -- Caso 1: Creación válida
 BEGIN
   BEGIN
     pkg_admin_productos.p_crear_usuario(
-      usuario(999, 'user_test1', 'Usuario de Prueba 1', NULL, 'test1@correo.com', 600111111, 1, 1),
+      usuario(999, 'usrtest', 'Test Usuario', NULL, 'test@correo.com', 600000000, 1, 1),
       'usuario_estandar',
-      'Password123'
+      'Test1234'
     );
-    registrar_prueba('p_crear_usuario (válido)', 'ÉXITO', 'Usuario creado correctamente');
+    registrar_prueba('p_crear_usuario (válido)', 'ÉXITO', 'Usuario creado');
   EXCEPTION
     WHEN OTHERS THEN
       registrar_prueba('p_crear_usuario (válido)', 'ERROR', SQLERRM);
@@ -289,15 +318,15 @@ BEGIN
 END;
 /
 
--- Caso 2: Creación con conflicto
+-- Caso 2: Usuario duplicado
 BEGIN
   BEGIN
     pkg_admin_productos.p_crear_usuario(
-      usuario(999, 'user_test1', 'Usuario de Conflicto', NULL, 'duplicado@correo.com', 600222222, 1, 1),
+      usuario(999, 'usrtest', 'Test Usuario', NULL, 'dup@correo.com', 600000001, 1, 1),
       'usuario_estandar',
-      'Password123'
+      'Test1234'
     );
-    registrar_prueba('p_crear_usuario (duplicado)', 'ÉXITO', 'Intento de crear usuario ya existente');
+    registrar_prueba('p_crear_usuario (duplicado)', 'ÉXITO', 'Intento de duplicación');
   EXCEPTION
     WHEN OTHERS THEN
       registrar_prueba('p_crear_usuario (duplicado)', 'ERROR', SQLERRM);
