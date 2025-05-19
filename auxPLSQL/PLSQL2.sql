@@ -224,3 +224,63 @@ EXCEPTION
 END;
 /
 
+--P4:p_replicar_atributos
+
+CREATE OR REPLACE PROCEDURE p_replicar_atributos (
+  p_gtin_origen IN producto.gtin%TYPE,
+  p_cuenta_id   IN producto.cuentaid%TYPE
+) IS
+  v_mensaje VARCHAR2(500);
+BEGIN
+  -- Paso 1: Validar acceso
+  IF NOT f_verificar_cuenta_usuario(p_cuenta_id) THEN
+    RAISE_APPLICATION_ERROR(-20001, 'Acceso no autorizado a la cuenta.');
+  END IF;
+
+  -- Paso 2: Verificar que el producto origen existe
+  DECLARE
+    v_dummy NUMBER;
+  BEGIN
+    SELECT 1 INTO v_dummy
+    FROM producto
+    WHERE gtin = p_gtin_origen AND cuentaid = p_cuenta_id;
+  EXCEPTION
+    WHEN NO_DATA_FOUND THEN
+      RAISE_APPLICATION_ERROR(-20002, 'El producto origen no existe en la cuenta.');
+  END;
+
+  -- Paso 3: Insertar atributos del origen en productos que no los tienen
+  INSERT INTO atributosproducto (
+    atributoid, productogtin, productocuentaid, valor
+  )
+  SELECT
+    ap.atributoid,
+    pr.gtin,
+    pr.cuentaid,
+    ap.valor
+  FROM atributosproducto ap
+  JOIN producto pr ON pr.cuentaid = p_cuenta_id
+  WHERE ap.productogtin = p_gtin_origen
+    AND ap.productocuentaid = p_cuenta_id
+    AND pr.gtin != p_gtin_origen
+    AND NOT EXISTS (
+      SELECT 1
+      FROM atributosproducto ap2
+      WHERE ap2.atributoid = ap.atributoid
+        AND ap2.productogtin = pr.gtin
+        AND ap2.productocuentaid = pr.cuentaid
+    );
+
+EXCEPTION
+  WHEN OTHERS THEN
+    v_mensaje := SUBSTR(SQLCODE || ' ' || SQLERRM, 1, 500);
+    INSERT INTO traza VALUES (
+      SYSDATE,
+      SYS_CONTEXT('USERENV','SESSION_USER'),
+      'p_replicar_atributos',
+      v_mensaje
+    );
+    RAISE;
+END;
+/
+
