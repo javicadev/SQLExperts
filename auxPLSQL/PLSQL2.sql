@@ -2,9 +2,9 @@
 --SI COMPILAN--
 
 
------------------
+-----------------------------------------------------------------------------------------
 --RECORDAR EXCEPCIONESSSSS!!! DECLARACCION EN EL PAQUETE, para probar podemos declararla en la misma funcion
------------------------------
+------------------------------------------------------------------
 
 --F1:: f_validar_plan_suficiente
 
@@ -172,4 +172,55 @@ EXCEPTION
 END;
 /
 
---F3:
+--P3: p_migrar_productos_a_categorias
+CREATE OR REPLACE PROCEDURE p_migrar_productos_a_categoria (
+  p_categoria_id       IN categoria.id%TYPE,
+  p_categoria_cuentaid IN categoria.cuentaid%TYPE
+) IS
+  v_mensaje VARCHAR2(500);
+BEGIN
+  -- Paso 1: Verificar que el usuario conectado tiene acceso a la cuenta de la categoría
+  IF NOT f_verificar_cuenta_usuario(p_categoria_cuentaid) THEN
+    RAISE_APPLICATION_ERROR(-20001, 'Acceso no autorizado a la cuenta.');
+  END IF;
+
+  -- Paso 2: Verificar que la categoría existe
+  DECLARE
+    v_dummy NUMBER;
+  BEGIN
+    SELECT 1 INTO v_dummy
+    FROM categoria
+    WHERE id = p_categoria_id
+      AND cuentaid = p_categoria_cuentaid;
+  EXCEPTION
+    WHEN NO_DATA_FOUND THEN
+      RAISE_APPLICATION_ERROR(-20002, 'La categoría indicada no existe.');
+  END;
+
+  -- Paso 3: Insertar relaciones para productos sin categoría
+  INSERT INTO relacionproductocategoria (
+    categoriaid, categoriacuentaid, productogtin, productocuentaid
+  )
+  SELECT
+    p_categoria_id, p_categoria_cuentaid, pr.gtin, pr.cuentaid
+  FROM producto pr
+  WHERE pr.cuentaid = p_categoria_cuentaid
+    AND NOT EXISTS (
+      SELECT 1 FROM relacionproductocategoria rpc
+      WHERE rpc.productogtin = pr.gtin
+        AND rpc.productocuentaid = pr.cuentaid
+    );
+
+EXCEPTION
+  WHEN OTHERS THEN
+    v_mensaje := SUBSTR(SQLCODE || ' ' || SQLERRM, 1, 500);
+    INSERT INTO traza VALUES (
+      SYSDATE,
+      SYS_CONTEXT('USERENV','SESSION_USER'),
+      'p_migrar_productos_a_categoria',
+      v_mensaje
+    );
+    RAISE;
+END;
+/
+
