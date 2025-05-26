@@ -1432,404 +1432,432 @@ END pkg_admin_productos;
 
 -- Creamos el paquet pkg_admin_productos_avanzado que contiene las funciones y procedimientos
 -- necesarios para la migracion de productos y la asociacion de activos a productos
-
 create or replace package pkg_admin_productos_avanzado is
-
-   -- Excepciones personalizadas
+  ---------------------------------------------------------------------------
+  -- EXCEPCIONES PERSONALIZADAS
+  ---------------------------------------------------------------------------
    exception_plan_no_asignado exception;
 
-   -- FUNCIONES
+  ---------------------------------------------------------------------------
+  -- FUNCIONES
+  ---------------------------------------------------------------------------
    function f_validar_plan_suficiente (
       p_cuenta_id in cuenta.id%type
    ) return varchar2;
 
    function f_lista_categorias_producto (
       p_producto_gtin in producto.gtin%type,
-      p_cuenta_id     in producto.cuenta_id%type
+      p_cuenta_id     in producto.cuentaid%type
    ) return varchar2;
 
-   -- PROCEDIMIENTOS
+  ---------------------------------------------------------------------------
+  -- PROCEDIMIENTOS
+  ---------------------------------------------------------------------------
    procedure p_migrar_productos_a_categoria (
-      p_cuenta_id            in cuenta.id%type,
-      p_categoria_origen_id  in categoria.id%type,
-      p_categoria_destino_id in categoria.id%type
+      p_categoria_id       in categoria.id%type,
+      p_categoria_cuentaid in categoria.cuentaid%type
    );
 
    procedure p_replicar_atributos (
-      p_cuenta_id             in cuenta.id%type,
-      p_producto_gtin_origen  in producto.gtin%type,
-      p_producto_gtin_destino in producto.gtin%type
+      p_gtin_origen in producto.gtin%type,
+      p_cuenta_id   in producto.cuentaid%type
    );
 
 end pkg_admin_productos_avanzado;
+/
 
+
+
+--CUERPO DEL PAQUETE
 create or replace package body pkg_admin_productos_avanzado is
 
+--F1:: f_validar_plan_suficiente
 
--- 1. FUNCION: F_VALIDAR_PLAN_SUFICIENTE
    function f_validar_plan_suficiente (
       p_cuenta_id in cuenta.id%type
    ) return varchar2 is
-      v_plan        plan%rowtype;
-      v_productos   number;
-      v_activos     number;
-      v_cat_prod    number;
-      v_cat_activos number;
-      v_relaciones  number;
+      v_mensaje            varchar2(500);
+      v_resultado          varchar2(100);
+
+  -- Contadores actuales
+      v_total_productos    number;
+      v_total_activos      number;
+      v_total_cat_producto number;
+      v_total_cat_activos  number;
+      v_total_relaciones   number;
+
+  -- Límites del plan
+      v_lim_productos      number;
+      v_lim_activos        number;
+      v_lim_cat_producto   number;
+      v_lim_cat_activos    number;
+      v_lim_relaciones     number;
+
+  -- ID del plan
+      v_plan_id            plan.id%type;
    begin
-      -- Paso 0: Verificar acceso del usuario
-      if not pkg_admin_productos.f_verificar_cuenta_usuario(p_cuenta_id) then
+  -- Validar acceso
+      if not f_verificar_cuenta_usuario(p_cuenta_id) then
          raise_application_error(
             -20001,
-            'Acceso denegado a la cuenta.'
+            'Acceso no autorizado a la cuenta.'
          );
       end if;
 
-      -- Paso 1: Obtener plan de la cuenta
+  -- Verificar que la cuenta existe y tiene plan
       begin
-         v_plan := pkg_admin_productos.f_obtener_plan_cuenta(p_cuenta_id);
+         select planid
+           into v_plan_id
+           from cuenta
+          where id = p_cuenta_id;
       exception
-         when pkg_admin_productos.exception_plan_no_asignado then
-            insert into traza values ( sysdate,
-                                       user,
-                                       $$plsql_unit,
-                                       'Cuenta sin plan' );
-            raise exception_plan_no_asignado;
          when no_data_found then
-            insert into traza values ( sysdate,
-                                       user,
-                                       $$plsql_unit,
-                                       'Cuenta no encontrada' );
             raise;
       end;
 
-      -- Paso 2: Contar recursos directamente
+      if v_plan_id is null then
+         raise exception_plan_no_asignado;
+      end if;
 
+  -- Obtener límites del plan
+      select to_number(productos),
+             to_number(activos),
+             to_number(categoriasproducto),
+             to_number(categoriasactivos),
+             to_number(relaciones)
+        into
+         v_lim_productos,
+         v_lim_activos,
+         v_lim_cat_producto,
+         v_lim_cat_activos,
+         v_lim_relaciones
+        from plan
+       where id = v_plan_id;
+
+  -- Contar recursos usados por la cuenta
       select count(*)
-        into v_productos
+        into v_total_productos
         from producto
-       where cuenta_id = p_cuenta_id;
-      select count(*)
-        into v_activos
-        from activos
-       where cuenta_id = p_cuenta_id;
-      select count(distinct categoria_id)
-        into v_cat_prod
-        from prod_cat
-       where producto_cuenta_id = p_cuenta_id;
-      select count(*)
-        into v_cat_activos
-        from categoria_activo
-       where cuenta_id = p_cuenta_id;
-      select count(*)
-        into v_relaciones
-        from relacionado
-       where producto1_cuenta_id = p_cuenta_id
-          or producto2_cuenta_id = p_cuenta_id;
+       where cuentaid = p_cuenta_id;
 
-      -- Paso 3: Comparar con límites del plan
-      if v_productos > v_plan.limite_productos then
+      select count(*)
+        into v_total_activos
+        from activo
+       where cuentaid = p_cuenta_id;
+
+      select count(*)
+        into v_total_cat_producto
+        from categoria
+       where cuentaid = p_cuenta_id;
+
+      select count(*)
+        into v_total_cat_activos
+        from categoriaactivos
+       where cuentaid = p_cuenta_id;
+
+      select count(*)
+        into v_total_relaciones
+        from relacionado
+       where productocuentaid = p_cuenta_id
+          or productocuentaid1 = p_cuenta_id;
+
+  -- Comparaciones
+      if v_total_productos > v_lim_productos then
          return 'INSUFICIENTE: PRODUCTOS';
-      elsif v_activos > v_plan.limite_activos then
+      elsif v_total_activos > v_lim_activos then
          return 'INSUFICIENTE: ACTIVOS';
-      elsif v_cat_prod > v_plan.limite_categoriasproducto then
-         return 'INSUFICIENTE: CATEGORIAS_PRODUCTO';
-      elsif v_cat_activos > v_plan.limite_categoriasactivos then
-         return 'INSUFICIENTE: CATEGORIAS_ACTIVOS';
-      elsif v_relaciones > v_plan.limite_relaciones then
+      elsif v_total_cat_producto > v_lim_cat_producto then
+         return 'INSUFICIENTE: CATEGORIASPRODUCTO';
+      elsif v_total_cat_activos > v_lim_cat_activos then
+         return 'INSUFICIENTE: CATEGORIASACTIVOS';
+      elsif v_total_relaciones > v_lim_relaciones then
          return 'INSUFICIENTE: RELACIONES';
       else
          return 'SUFICIENTE';
       end if;
 
    exception
-      when others then
+      when exception_plan_no_asignado then
+         v_mensaje := 'La cuenta no tiene plan asociado.';
          insert into traza values ( sysdate,
-                                    user,
-                                    $$plsql_unit,
-                                    sqlcode
-                                    || ' '
-                                    || sqlerrm );
-         dbms_output.put_line('Error en F_VALIDAR_PLAN_SUFICIENTE: ' || sqlerrm);
+                                    sys_context(
+                                       'USERENV',
+                                       'SESSION_USER'
+                                    ),
+                                    'f_validar_plan_suficiente',
+                                    v_mensaje );
          raise;
-   end f_validar_plan_suficiente;
+      when no_data_found then
+         v_mensaje := 'Cuenta no encontrada.';
+         insert into traza values ( sysdate,
+                                    sys_context(
+                                       'USERENV',
+                                       'SESSION_USER'
+                                    ),
+                                    'f_validar_plan_suficiente',
+                                    v_mensaje );
+         raise;
+      when others then
+         v_mensaje := substr(
+            sqlcode
+            || ' '
+            || sqlerrm,
+            1,
+            500
+         );
+         insert into traza values ( sysdate,
+                                    sys_context(
+                                       'USERENV',
+                                       'SESSION_USER'
+                                    ),
+                                    'f_validar_plan_suficiente',
+                                    v_mensaje );
+         raise;
+   end;
 
--- 2. FUNCION: F_LISTA_CATEGORIAS_PRODUCTO
+--F2: f_lista_categorias_producto
+
    function f_lista_categorias_producto (
       p_producto_gtin in producto.gtin%type,
-      p_cuenta_id     in producto.cuenta_id%type
+      p_cuenta_id     in producto.cuentaid%type
    ) return varchar2 is
-      v_lista  varchar2(1000) := '';
-      v_nombre categoria.nombre%type;
-      cursor c_categorias is
-      select c.nombre
-        from categoria c
-        join prod_cat pc
-      on c.id = pc.categoria_id
-       where pc.producto_gtin = p_producto_gtin
-         and pc.producto_cuenta_id = p_cuenta_id
-         and c.cuenta_id = p_cuenta_id;
+      v_lista   varchar2(1000);
+      v_mensaje varchar2(500);
    begin
-      -- Paso 0: Verificar que el usuario tiene acceso a la cuenta
-      if not pkg_admin_productos.f_verificar_cuenta_usuario(p_cuenta_id) then
+  -- Verificar acceso
+      if not f_verificar_cuenta_usuario(p_cuenta_id) then
          raise_application_error(
             -20001,
-            'Acceso denegado a la cuenta.'
+            'Acceso no autorizado.'
          );
       end if;
 
-      -- Paso 1: Verificar que el producto existe en esa cuenta
+  -- Obtener lista de categorías
+      select
+         listagg(c.nombre,
+                 ', ') within group(
+          order by c.nombre)
+        into v_lista
+        from relacionproductocategoria rpc
+        join categoria c
+      on rpc.categoriaid = c.id
+         and rpc.categoriacuentaid = c.cuentaid
+       where rpc.productogtin = p_producto_gtin
+         and rpc.productocuentaid = p_cuenta_id;
+
+      return nvl(
+         v_lista,
+         ''
+      );
+   exception
+      when no_data_found then
+         return ''; -- Producto sin categorías
+
+      when others then
+         v_mensaje := substr(
+            sqlcode
+            || ' '
+            || sqlerrm,
+            1,
+            500
+         );
+         insert into traza values ( sysdate,
+                                    sys_context(
+                                       'USERENV',
+                                       'SESSION_USER'
+                                    ),
+                                    'f_lista_categorias_producto',
+                                    v_mensaje );
+         raise;
+   end;
+
+--P3: p_migrar_productos_a_categorias
+   procedure p_migrar_productos_a_categoria (
+      p_categoria_id       in categoria.id%type,
+      p_categoria_cuentaid in categoria.cuentaid%type
+   ) is
+      v_mensaje varchar2(500);
+   begin
+  -- Paso 1: Verificar que el usuario conectado tiene acceso a la cuenta de la categoría
+      if not f_verificar_cuenta_usuario(p_categoria_cuentaid) then
+         raise_application_error(
+            -20001,
+            'Acceso no autorizado a la cuenta.'
+         );
+      end if;
+
+  -- Paso 2: Verificar que la categoría existe
       declare
          v_dummy number;
       begin
          select 1
            into v_dummy
-           from producto
-          where gtin = p_producto_gtin
-            and cuenta_id = p_cuenta_id;
+           from categoria
+          where id = p_categoria_id
+            and cuentaid = p_categoria_cuentaid;
       exception
          when no_data_found then
-            insert into traza values ( sysdate,
-                                       user,
-                                       $$plsql_unit,
-                                       'Producto no encontrado' );
-            raise;
+            raise_application_error(
+               -20002,
+               'La categoría indicada no existe.'
+            );
       end;
 
-      -- Paso 2: Concatenar nombres de categoría
-      for r in c_categorias loop
-         if
-            v_lista is not null
-            and v_lista != ''
-         then
-            v_lista := v_lista || ' ; ';
-         end if;
-         v_lista := v_lista || r.nombre;
-      end loop;
-
-      -- Paso 3: Si no hay categorías, devolver mensaje
-      if v_lista is null
-      or v_lista = '' then
-         return 'Sin categoría';
-      else
-         return v_lista;
-      end if;
+  -- Paso 3: Insertar relaciones para productos sin categoría
+      insert into relacionproductocategoria (
+         categoriaid,
+         categoriacuentaid,
+         productogtin,
+         productocuentaid
+      )
+         select p_categoria_id,
+                p_categoria_cuentaid,
+                pr.gtin,
+                pr.cuentaid
+           from producto pr
+          where pr.cuentaid = p_categoria_cuentaid
+            and not exists (
+            select 1
+              from relacionproductocategoria rpc
+             where rpc.productogtin = pr.gtin
+               and rpc.productocuentaid = pr.cuentaid
+         );
 
    exception
       when others then
+         v_mensaje := substr(
+            sqlcode
+            || ' '
+            || sqlerrm,
+            1,
+            500
+         );
          insert into traza values ( sysdate,
-                                    user,
-                                    $$plsql_unit,
-                                    sqlcode
-                                    || ' '
-                                    || sqlerrm );
-         dbms_output.put_line('Error en F_LISTA_CATEGORIAS_PRODUCTO: ' || sqlerrm);
+                                    sys_context(
+                                       'USERENV',
+                                       'SESSION_USER'
+                                    ),
+                                    'p_migrar_productos_a_categoria',
+                                    v_mensaje );
          raise;
-   end f_lista_categorias_producto;
+   end;
 
-   procedure p_migrar_productos_a_categoria (
-      p_cuenta_id            in cuenta.id%type,
-      p_categoria_origen_id  in categoria.id%type,
-      p_categoria_destino_id in categoria.id%type
-   ) is
-      cursor c_productos is
-      select producto_gtin
-        from prod_cat
-       where categoria_id = p_categoria_origen_id
-         and producto_cuenta_id = p_cuenta_id;
+--P4:p_replicar_atributos
 
-   begin
-      -- Paso 0: Verificar que el usuario tiene acceso a la cuenta
-      if not pkg_admin_productos.f_verificar_cuenta_usuario(p_cuenta_id) then
-         raise_application_error(
-            -20001,
-            'Acceso denegado a la cuenta.'
-         );
-      end if;
-
-      -- Paso 1: Verificar existencia de la cuenta y ambas categorías
-      declare
-         v_dummy number;
-      begin
-         select 1
-           into v_dummy
-           from cuenta
-          where id = p_cuenta_id;
-         select 1
-           into v_dummy
-           from categoria
-          where id = p_categoria_origen_id
-            and cuenta_id = p_cuenta_id;
-         select 1
-           into v_dummy
-           from categoria
-          where id = p_categoria_destino_id
-            and cuenta_id = p_cuenta_id;
-      exception
-         when no_data_found then
-            insert into traza values ( sysdate,
-                                       user,
-                                       $$plsql_unit,
-                                       'Cuenta o categorías no existen o no pertenecen a la cuenta' );
-            raise;
-      end;
-
-      -- Paso 2: Realizar las migraciones dentro de un bloque transaccional
-      begin
-         for r in c_productos loop
-            update prod_cat
-               set
-               categoria_id = p_categoria_destino_id
-             where producto_gtin = r.producto_gtin
-               and producto_cuenta_id = p_cuenta_id
-               and categoria_id = p_categoria_origen_id;
-         end loop;
-
-         dbms_output.put_line('Productos migrados correctamente.');
-      exception
-         when others then
-            -- ROLLBACK implícito al fallar el bloque
-            insert into traza values ( sysdate,
-                                       user,
-                                       $$plsql_unit,
-                                       sqlcode
-                                       || ' '
-                                       || sqlerrm );
-            dbms_output.put_line('Error en migración de productos: ' || sqlerrm);
-            raise;
-      end;
-
-   end p_migrar_productos_a_categoria;
-
-   -- 3. PROCEDURE: P_REPLICAR_ATRIBUTOS
    procedure p_replicar_atributos (
-      p_cuenta_id             in cuenta.id%type,
-      p_producto_gtin_origen  in producto.gtin%type,
-      p_producto_gtin_destino in producto.gtin%type
+      p_gtin_origen in producto.gtin%type,
+      p_cuenta_id   in producto.cuentaid%type
    ) is
-      cursor c_origen is
-      select atributo_codigo,
-             valor
-        from atributo_producto
-       where producto_gtin = p_producto_gtin_origen
-         and producto_cuenta_id = p_cuenta_id;
-
-      v_existe number;
+      v_mensaje varchar2(500);
    begin
-      -- Paso 0: Verificar que el usuario puede acceder a esta cuenta
-      if not pkg_admin_productos.f_verificar_cuenta_usuario(p_cuenta_id) then
+  -- Paso 1: Validar acceso
+      if not f_verificar_cuenta_usuario(p_cuenta_id) then
          raise_application_error(
             -20001,
-            'Acceso denegado a la cuenta.'
+            'Acceso no autorizado a la cuenta.'
          );
       end if;
 
-      -- Paso 1: Verificar que ambos productos existen
+  -- Paso 2: Verificar que el producto origen existe
       declare
          v_dummy number;
       begin
          select 1
            into v_dummy
            from producto
-          where gtin = p_producto_gtin_origen
-            and cuenta_id = p_cuenta_id;
-         select 1
-           into v_dummy
-           from producto
-          where gtin = p_producto_gtin_destino
-            and cuenta_id = p_cuenta_id;
+          where gtin = p_gtin_origen
+            and cuentaid = p_cuenta_id;
       exception
          when no_data_found then
-            insert into traza values ( sysdate,
-                                       user,
-                                       $$plsql_unit,
-                                       'Uno o ambos productos no existen' );
-            raise;
-            end;
+            raise_application_error(
+               -20002,
+               'El producto origen no existe en la cuenta.'
+            );
+      end;
 
-      -- Paso 2: Recorremos los atributos del producto origen
-            begin
-               for r in c_origen loop
-            -- Verificamos si ya existe el atributo en el producto destino
-                  select count(*)
-                    into v_existe
-                    from atributo_producto
-                   where producto_gtin = p_producto_gtin_destino
-                     and producto_cuenta_id = p_cuenta_id
-                     and atributo_codigo = r.atributo_codigo;
+  -- Paso 3: Insertar atributos del origen en productos que no los tienen
+      insert into atributosproducto (
+         atributoid,
+         productogtin,
+         productocuentaid,
+         valor
+      )
+         select ap.atributoid,
+                pr.gtin,
+                pr.cuentaid,
+                ap.valor
+           from atributosproducto ap
+           join producto pr
+         on pr.cuentaid = p_cuenta_id
+          where ap.productogtin = p_gtin_origen
+            and ap.productocuentaid = p_cuenta_id
+            and pr.gtin != p_gtin_origen
+            and not exists (
+            select 1
+              from atributosproducto ap2
+             where ap2.atributoid = ap.atributoid
+               and ap2.productogtin = pr.gtin
+               and ap2.productocuentaid = pr.cuentaid
+         );
 
-                  if v_existe = 0 then
-               -- No existe: insertamos
-                     insert into atributo_producto (
-                        producto_gtin,
-                        producto_cuenta_id,
-                        atributo_codigo,
-                        valor
-                     ) values ( p_producto_gtin_destino,
-                                p_cuenta_id,
-                                r.atributo_codigo,
-                                r.valor );
-                  else
-               -- Ya existe: actualizamos valor
-                     update atributo_producto
-                        set
-                        valor = r.valor
-                      where producto_gtin = p_producto_gtin_destino
-                        and producto_cuenta_id = p_cuenta_id
-                        and atributo_codigo = r.atributo_codigo;
-                  end if;
-               end loop;
+   exception
+      when others then
+         v_mensaje := substr(
+            sqlcode
+            || ' '
+            || sqlerrm,
+            1,
+            500
+         );
+         insert into traza values ( sysdate,
+                                    sys_context(
+                                       'USERENV',
+                                       'SESSION_USER'
+                                    ),
+                                    'p_replicar_atributos',
+                                    v_mensaje );
+         raise;
+   end;
+--FIN DEL PAQUETE
+end pkg_admin_productos_avanzado;
+/
 
-               dbms_output.put_line('Atributos replicados correctamente.');
-            exception
-               when others then
-                  insert into traza values ( sysdate,
-                                             user,
-                                             $$plsql_unit,
-                                             sqlcode
-                                             || ' '
-                                             || sqlerrm );
-                  dbms_output.put_line('Error durante la replicación: ' || sqlerrm);
-                  raise;
-            end;
 
-      end p_replicar_atributos;
-
--- CERRAMOS PAQUETE
-   end pkg_admin_productos_avanzado;
-
--- JOBS
+--JOBS
 begin
    dbms_scheduler.create_job(
       job_name        => 'J_LIMPIA_TRAZA',
       job_type        => 'PLSQL_BLOCK',
       job_action      => '
-         BEGIN
-            DELETE FROM traza WHERE fecha < SYSDATE - 1/1440;  -- más de 1 minuto
-            COMMIT;
-         END;',
+      BEGIN
+        DELETE FROM traza
+        WHERE fecha < SYSDATE - (1/1440);  -- 1 minuto para pruebas
+        COMMIT;
+      END;',
       start_date      => systimestamp,
-      repeat_interval => 'FREQ=MINUTELY; INTERVAL=2',
-      enabled         => true
+      repeat_interval => 'FREQ=MINUTELY;INTERVAL=2',
+      enabled         => true,
+      comments        => 'Limpia entradas de TRAZA de más de 1 minuto (simula 1 año para pruebas)'
    );
 end;
+/
 
 begin
    dbms_scheduler.create_job(
       job_name        => 'J_ACTUALIZA_PRODUCTOS',
       job_type        => 'PLSQL_BLOCK',
       job_action      => '
-         DECLARE
-            CURSOR c IS SELECT id FROM cuenta;
-         BEGIN
-            FOR r IN c LOOP
-               PKG_ADMIN_PRODUCTOS.P_ACTUALIZAR_PRODUCTOS(r.id);
-            END LOOP;
-         END;',
+      DECLARE
+        CURSOR c_cuentas IS SELECT id FROM cuenta;
+      BEGIN
+        FOR r IN c_cuentas LOOP
+          pkg_admin_productos.p_actualizar_productos(r.id);
+        END LOOP;
+      END;',
       start_date      => systimestamp,
-      repeat_interval => 'FREQ=DAILY',
-      enabled         => true
+      repeat_interval => 'FREQ=DAILY;BYHOUR=1;BYMINUTE=0;BYSECOND=0',
+      enabled         => true,
+      comments        => 'Actualiza productos desde productos_ext para todas las cuentas cada noche'
    );
 end;
-
-----------
+/

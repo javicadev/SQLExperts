@@ -2,13 +2,48 @@
 --SI COMPILAN--
 
 
------------------------------------------------------------------------------------------
---RECORDAR EXCEPCIONESSSSS!!! DECLARACCION EN EL PAQUETE, para probar podemos declararla en la misma funcion
-------------------------------------------------------------------
+create or replace package pkg_admin_productos_avanzado is
+  ---------------------------------------------------------------------------
+  -- EXCEPCIONES PERSONALIZADAS
+  ---------------------------------------------------------------------------
+   exception_plan_no_asignado exception;
+
+  ---------------------------------------------------------------------------
+  -- FUNCIONES
+  ---------------------------------------------------------------------------
+   function f_validar_plan_suficiente (
+      p_cuenta_id in cuenta.id%type
+   ) return varchar2;
+
+   function f_lista_categorias_producto (
+      p_producto_gtin in producto.gtin%type,
+      p_cuenta_id     in producto.cuentaid%type
+   ) return varchar2;
+
+  ---------------------------------------------------------------------------
+  -- PROCEDIMIENTOS
+  ---------------------------------------------------------------------------
+   procedure p_migrar_productos_a_categoria (
+      p_categoria_id       in categoria.id%type,
+      p_categoria_cuentaid in categoria.cuentaid%type
+   );
+
+   procedure p_replicar_atributos (
+      p_gtin_origen in producto.gtin%type,
+      p_cuenta_id   in producto.cuentaid%type
+   );
+
+end pkg_admin_productos_avanzado;
+/
+
+
+
+--CUERPO DEL PAQUETE
+create or replace package body pkg_admin_productos_avanzado IS
 
 --F1:: f_validar_plan_suficiente
 
-CREATE OR REPLACE FUNCTION f_validar_plan_suficiente (
+FUNCTION f_validar_plan_suficiente (
   p_cuenta_id IN cuenta.id%TYPE
 ) RETURN VARCHAR2 IS
   v_mensaje   VARCHAR2(500);
@@ -128,11 +163,10 @@ EXCEPTION
     );
     RAISE;
 END;
-/
 
 --F2: f_lista_categorias_producto
 
-CREATE OR REPLACE FUNCTION f_lista_categorias_producto (
+FUNCTION f_lista_categorias_producto (
   p_producto_gtin IN producto.gtin%TYPE,
   p_cuenta_id     IN producto.cuentaid%TYPE
 ) RETURN VARCHAR2 IS
@@ -170,10 +204,9 @@ EXCEPTION
     );
     RAISE;
 END;
-/
 
 --P3: p_migrar_productos_a_categorias
-CREATE OR REPLACE PROCEDURE p_migrar_productos_a_categoria (
+PROCEDURE p_migrar_productos_a_categoria (
   p_categoria_id       IN categoria.id%TYPE,
   p_categoria_cuentaid IN categoria.cuentaid%TYPE
 ) IS
@@ -222,11 +255,10 @@ EXCEPTION
     );
     RAISE;
 END;
-/
 
 --P4:p_replicar_atributos
 
-CREATE OR REPLACE PROCEDURE p_replicar_atributos (
+PROCEDURE p_replicar_atributos (
   p_gtin_origen IN producto.gtin%TYPE,
   p_cuenta_id   IN producto.cuentaid%TYPE
 ) IS
@@ -282,7 +314,10 @@ EXCEPTION
     );
     RAISE;
 END;
+--FIN DEL PAQUETE
+END pkg_admin_productos_avanzado;
 /
+
 
 --JOBS
 BEGIN
