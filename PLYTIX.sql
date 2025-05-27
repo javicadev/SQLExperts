@@ -834,28 +834,24 @@ create or replace trigger trg_asignar_perfil_plytix
       v_event_user   varchar2(30);
       v_created_user varchar2(30);
    begin
+   -- Quien ejecuta CREATE USER
       v_event_user := sys_context(
          'USERENV',
          'SESSION_USER'
       );
-      if v_event_user = 'PLYTIX' then
-      -- Extraer el nombre del usuario recién creado
-         select regexp_substr(
-            ora_sql_txt,
-            '\\b\\w+\\b$',
-            1,
-            1
-         )
-           into v_created_user
-           from dual;
 
-      -- Aplicar perfil automáticamente
+   -- Nombre del objeto creado (en este caso, el nombre del nuevo usuario)
+      v_created_user := ora_dict_obj_name;
+
+   -- Si el creador fue PLYTIX, aplicamos el perfil
+      if v_event_user = 'PLYTIX' then
          execute immediate 'ALTER USER '
                            || v_created_user
                            || ' PROFILE perfil_plytix';
       end if;
    end;
 /
+
 
 -----------------------------------------------------------------------------------------------
 -- PL/SQL (PARTE 1)
