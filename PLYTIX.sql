@@ -822,6 +822,41 @@ GRANT SELECT ON V_USUARIO_PUBLICO TO gestor_cuentas;
 --PARA EL RF4
 GRANT SELECT, INSERT, UPDATE, DELETE ON PLAN TO planificador_servicios;
 
+--POLITICA DE CONTRASEÑAS PERFIL CREADO EN SYSTEM
+CREATE PROFILE perfil_controlado LIMIT
+   PASSWORD_LIFE_TIME 45
+   FAILED_LOGIN_ATTEMPTS 3
+   PASSWORD_LOCK_TIME 0.0416; -- 1 hora
+
+-- Y CREAR TRIGGER PARA ASIGNAR PERFIL AUTOMÁTICAMENTE AL CREAR USUARIO
+create or replace trigger trg_asignar_perfil_plytix
+   after create on database declare
+      v_event_user   varchar2(30);
+      v_created_user varchar2(30);
+   begin
+      v_event_user := sys_context(
+         'USERENV',
+         'SESSION_USER'
+      );
+      if v_event_user = 'PLYTIX' then
+      -- Extraer el nombre del usuario recién creado
+         select regexp_substr(
+            ora_sql_txt,
+            '\\b\\w+\\b$',
+            1,
+            1
+         )
+           into v_created_user
+           from dual;
+
+      -- Aplicar perfil automáticamente
+         execute immediate 'ALTER USER '
+                           || v_created_user
+                           || ' PROFILE perfil_plytix';
+      end if;
+   end;
+/
+
 -----------------------------------------------------------------------------------------------
 -- PL/SQL (PARTE 1)
 
