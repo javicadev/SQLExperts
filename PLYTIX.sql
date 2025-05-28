@@ -828,7 +828,7 @@ CREATE PROFILE perfil_plytix LIMIT
    FAILED_LOGIN_ATTEMPTS 3
    PASSWORD_LOCK_TIME 0.0416; -- 1 hora
 
--- Y CREAR TRIGGER PARA ASIGNAR PERFIL AUTOMÁTICAMENTE AL CREAR USUARIO
+-- (NO SE ESTA USANDO!!!!!)  CREAR TRIGGER PARA ASIGNAR PERFIL AUTOMÁTICAMENTE AL CREAR USUARIO
 create or replace trigger trg_asignar_perfil_plytix
    after create on database declare
       v_event_user   varchar2(30);
