@@ -936,41 +936,46 @@ END pkg_admin_productos;
 --CUERPO DEL PAQUETE
 CREATE OR REPLACE PACKAGE BODY pkg_admin_productos IS
 --auxiliar
-FUNCTION f_verificar_cuenta_usuario (
-  p_cuentaid IN cuenta.id%TYPE
-) RETURN BOOLEAN IS
-  v_dummy   NUMBER;
-  v_mensaje VARCHAR2(500);
-BEGIN
-  SELECT 1
-  INTO v_dummy
-  FROM usuario
-  WHERE UPPER(nombreusuario) = UPPER(SYS_CONTEXT('USERENV','SESSION_USER'))
-    AND cuentaid = p_cuentaid;
+   FUNCTION f_verificar_cuenta_usuario (
+      p_cuentaid in cuenta.id%type
+   ) return boolean is
+      v_dummy   number;
+      v_mensaje varchar2(500);
+   begin
+      select count(*)
+        into v_dummy
+        from usuario
+       where upper(nombreusuario) = upper(sys_context(
+            'USERENV',
+            'SESSION_USER'
+         ))
+         and cuentaid = p_cuentaid;
 
-  RETURN TRUE;
-
-EXCEPTION
-  WHEN NO_DATA_FOUND THEN
-    v_mensaje := 'El usuario no pertenece a la cuenta indicada.';
-    INSERT INTO traza VALUES (
-      SYSDATE,
-      SYS_CONTEXT('USERENV','SESSION_USER'),
-      'f_verificar_cuenta_usuario',
-      v_mensaje
-    );
-    RETURN FALSE;
-
-  WHEN OTHERS THEN
-    v_mensaje := SUBSTR(SQLCODE || ' ' || SQLERRM, 1, 500);
-    INSERT INTO traza VALUES (
-      SYSDATE,
-      SYS_CONTEXT('USERENV','SESSION_USER'),
-      'f_verificar_cuenta_usuario',
-      v_mensaje
-    );
-    RETURN FALSE;
-END f_verificar_cuenta_usuario;
+      if v_dummy > 0 then
+         return true;
+      else
+         return false;
+      end if;
+   exception
+      when no_data_found then
+         v_mensaje := 'El usuario no pertenece a la cuenta indicada.';
+         insert into traza values ( sysdate,sys_context('USERENV','SESSION_USER'),
+         'f_verificar_cuenta_usuario',
+         v_mensaje );
+         return false;
+      when others then
+         v_mensaje := substr(
+            sqlcode
+            || ' '
+            || sqlerrm,
+            1,
+            500
+         );
+         insert into traza values ( sysdate,
+    sys_context('USERENV', 'SESSION_USER'),
+    'f_verificar_cuenta_usuario',v_mensaje );
+         return false;
+   end;
 
 --F1:f_obtener_plan_cuenta
 FUNCTION f_obtener_plan_cuenta (
