@@ -611,6 +611,7 @@ DECLARE
 BEGIN
 if :new.GTIN is null then  
 :new.GTIN := SEQ_PRODUCTOS.NEXTVAL; 
+end if; 
 
   -- Obtener la cuenta del usuario conectado por nombre de sesión (igual que la vista V_PRODUCTOS_USUARIO)
   SELECT CuentaId INTO v_cuenta_id
@@ -826,6 +827,147 @@ GRANT SELECT ON V_USUARIO_PUBLICO TO gestor_cuentas;
 
 --PARA EL RF4
 GRANT SELECT, INSERT, UPDATE, DELETE ON PLAN TO planificador_servicios;
+
+
+--LLENAMOS OCN MAS DATOS
+INSERT INTO CATEGORIA (ID, NOMBRE, CUENTAID) VALUES (5, 'Ropa 5', 2);
+INSERT INTO CATEGORIA (ID, NOMBRE, CUENTAID) VALUES (6, 'Deporte 6', 2);
+INSERT INTO CATEGORIA (ID, NOMBRE, CUENTAID) VALUES (7, 'Electrónica 7', 1);
+INSERT INTO CATEGORIA (ID, NOMBRE, CUENTAID) VALUES (8, 'Juguetes 8', 2);
+INSERT INTO CATEGORIA (ID, NOMBRE, CUENTAID) VALUES (9, 'Electrónica 9', 1);
+INSERT INTO CATEGORIA (ID, NOMBRE, CUENTAID) VALUES (10, 'Accesorios 10', 2);
+INSERT INTO CATEGORIA (ID, NOMBRE, CUENTAID) VALUES (11, 'Ropa 11', 2);
+INSERT INTO CATEGORIA (ID, NOMBRE, CUENTAID) VALUES (12, 'Belleza 12', 2);
+INSERT INTO CATEGORIA (ID, NOMBRE, CUENTAID) VALUES (13, 'Electrónica 13', 2);
+INSERT INTO CATEGORIA (ID, NOMBRE, CUENTAID) VALUES (14, 'Jardín 14', 1);
+INSERT INTO CATEGORIA (ID, NOMBRE, CUENTAID) VALUES (15, 'Belleza 15', 2);
+INSERT INTO CATEGORIA (ID, NOMBRE, CUENTAID) VALUES (16, 'Juguetes 16', 2);
+INSERT INTO CATEGORIA (ID, NOMBRE, CUENTAID) VALUES (17, 'Deporte 17', 1);
+INSERT INTO CATEGORIA (ID, NOMBRE, CUENTAID) VALUES (18, 'Automóvil 18', 2);
+INSERT INTO CATEGORIA (ID, NOMBRE, CUENTAID) VALUES (19, 'Cocina 19', 1);
+INSERT INTO CATEGORIA (ID, NOMBRE, CUENTAID) VALUES (20, 'Jardín 20', 1);
+INSERT INTO CATEGORIA (ID, NOMBRE, CUENTAID) VALUES (21, 'Juguetes 21', 2);
+INSERT INTO CATEGORIA (ID, NOMBRE, CUENTAID) VALUES (22, 'Deporte 22', 2);
+INSERT INTO CATEGORIA (ID, NOMBRE, CUENTAID) VALUES (23, 'Belleza 23', 1);
+INSERT INTO CATEGORIA (ID, NOMBRE, CUENTAID) VALUES (24, 'Deporte 24', 1);
+INSERT INTO CATEGORIA (ID, NOMBRE, CUENTAID) VALUES (25, 'Electrónica 25', 2);
+INSERT INTO CATEGORIA (ID, NOMBRE, CUENTAID) VALUES (26, 'Ropa 26', 2);
+INSERT INTO CATEGORIA (ID, NOMBRE, CUENTAID) VALUES (27, 'Electrónica 27', 2);
+commit;
+INSERT INTO usuario (
+   id,
+   nombreusuario,
+   nombrecompleto,
+   avatar,
+   correoelectronico,
+   telefono,
+   cuentaid,
+   cuentadueno
+)
+VALUES (
+   1000,
+   'PLYTIX',
+   'Juane',
+   'https://avatar.example.com/juane.png',
+   'juane@plytix.com',
+   600123456,
+   1,
+   1
+);
+
+COMMIT;
+
+
+INSERT INTO ACTIVO (ID, NOMBRE, TAMANO, TIPO, URL, CUENTAID) VALUES (501, 'Manual PDF', 1, 'Documento', 'https://plytix.com/manual501.pdf', 1);
+INSERT INTO ACTIVO (ID, NOMBRE, TAMANO, TIPO, URL, CUENTAID) VALUES (502, 'Imagen Producto', 2, 'Imagen', 'https://plytix.com/imagen502.png', 1);
+INSERT INTO ACTIVO (ID, NOMBRE, TAMANO, TIPO, URL, CUENTAID) VALUES (503, 'Garantía', 1, 'Documento', 'https://plytix.com/garantia503.pdf', 2);
+INSERT INTO ATRIBUTO (ID, NOMBRE, TIPO, CREADO, CUENTAID) VALUES (101, 'Color', 'Texto', TO_DATE('2023-03-01', 'YYYY-MM-DD'), 1);
+INSERT INTO ATRIBUTO (ID, NOMBRE, TIPO, CREADO, CUENTAID) VALUES (102, 'Peso', 'Número', TO_DATE('2023-05-15', 'YYYY-MM-DD'), 1);
+INSERT INTO ATRIBUTO (ID, NOMBRE, TIPO, CREADO, CUENTAID) VALUES (103, 'Material', 'Texto', TO_DATE('2024-01-10', 'YYYY-MM-DD'), 2);
+commit;
+
+-- PRODUCTO 26
+INSERT INTO producto (
+  gtin, sku, nombre, miniatura, textocorto, creado, cuentaid, publico
+) VALUES (
+  26, 'SKU026', 'Producto 26', NULL, 'Descripción 26', SYSDATE, 1, 'S'
+);
+
+-- PRODUCTO 84
+INSERT INTO producto (
+  gtin, sku, nombre, miniatura, textocorto, creado, cuentaid, publico
+) VALUES (
+  84, 'SKU084', 'Producto 84', NULL, 'Descripción 84', SYSDATE, 1, 'S'
+);
+
+-- PRODUCTO 102
+INSERT INTO producto (
+  gtin, sku, nombre, miniatura, textocorto, creado, cuentaid, publico
+) VALUES (
+  102, 'SKU102', 'Producto 102', NULL, 'Descripción 102', SYSDATE, 1, 'S'
+);
+
+-- PRODUCTO 186
+INSERT INTO producto (
+  gtin, sku, nombre, miniatura, textocorto, creado, cuentaid, publico
+) VALUES (
+  186, 'SKU186', 'Producto 186', NULL, 'Descripción 186', SYSDATE, 1, 'S'
+);
+
+
+INSERT INTO RELACIONADO (NOMBRE, SENTIDO, PRODUCTOGTIN, PRODUCTOGTIN1, PRODUCTOCUENTAID, PRODUCTOCUENTAID1) VALUES ('rel_26_84_1', 'directo', 26, 84, 1, 1);
+INSERT INTO RELACIONADO (NOMBRE, SENTIDO, PRODUCTOGTIN, PRODUCTOGTIN1, PRODUCTOCUENTAID, PRODUCTOCUENTAID1) VALUES ('rel_102_128_2', 'inverso', 102, 128, 1, 1);
+INSERT INTO RELACIONADO (NOMBRE, SENTIDO, PRODUCTOGTIN, PRODUCTOGTIN1, PRODUCTOCUENTAID, PRODUCTOCUENTAID1) VALUES ('rel_186_26_3', 'bidireccional', 186, 26, 1, 1);
+INSERT INTO RELACIONADO (NOMBRE, SENTIDO, PRODUCTOGTIN, PRODUCTOGTIN1, PRODUCTOCUENTAID, PRODUCTOCUENTAID1) VALUES ('rel_84_102_4', 'directo', 84, 102, 1, 1);
+INSERT INTO RELACIONADO (NOMBRE, SENTIDO, PRODUCTOGTIN, PRODUCTOGTIN1, PRODUCTOCUENTAID, PRODUCTOCUENTAID1) VALUES ('rel_128_186_5', 'inverso', 128, 186, 1, 1);
+INSERT INTO RELACIONADO (NOMBRE, SENTIDO, PRODUCTOGTIN, PRODUCTOGTIN1, PRODUCTOCUENTAID, PRODUCTOCUENTAID1) VALUES ('rel_26_102_6', 'bidireccional', 26, 102, 1, 1);
+INSERT INTO RELACIONADO (NOMBRE, SENTIDO, PRODUCTOGTIN, PRODUCTOGTIN1, PRODUCTOCUENTAID, PRODUCTOCUENTAID1) VALUES ('rel_84_186_7', 'directo', 84, 186, 1, 1);
+INSERT INTO RELACIONADO (NOMBRE, SENTIDO, PRODUCTOGTIN, PRODUCTOGTIN1, PRODUCTOCUENTAID, PRODUCTOCUENTAID1) VALUES ('rel_128_26_8', 'inverso', 128, 26, 1, 1);
+INSERT INTO RELACIONADO (NOMBRE, SENTIDO, PRODUCTOGTIN, PRODUCTOGTIN1, PRODUCTOCUENTAID, PRODUCTOCUENTAID1) VALUES ('rel_102_84_9', 'bidireccional', 102, 84, 1, 1);
+INSERT INTO RELACIONADO (NOMBRE, SENTIDO, PRODUCTOGTIN, PRODUCTOGTIN1, PRODUCTOCUENTAID, PRODUCTOCUENTAID1) VALUES ('rel_186_128_10', 'directo', 186, 128, 1, 1);
+INSERT INTO RELACIONADO (NOMBRE, SENTIDO, PRODUCTOGTIN, PRODUCTOGTIN1, PRODUCTOCUENTAID, PRODUCTOCUENTAID1) VALUES ('rel_26_128_11', 'inverso', 26, 128, 1, 1);
+INSERT INTO RELACIONADO (NOMBRE, SENTIDO, PRODUCTOGTIN, PRODUCTOGTIN1, PRODUCTOCUENTAID, PRODUCTOCUENTAID1) VALUES ('rel_84_26_12', 'bidireccional', 84, 26, 1, 1);
+INSERT INTO RELACIONADO (NOMBRE, SENTIDO, PRODUCTOGTIN, PRODUCTOGTIN1, PRODUCTOCUENTAID, PRODUCTOCUENTAID1) VALUES ('rel_102_186_13', 'directo', 102, 186, 1, 1);
+INSERT INTO RELACIONADO (NOMBRE, SENTIDO, PRODUCTOGTIN, PRODUCTOGTIN1, PRODUCTOCUENTAID, PRODUCTOCUENTAID1) VALUES ('rel_128_84_14', 'inverso', 128, 84, 1, 1);
+INSERT INTO RELACIONADO (NOMBRE, SENTIDO, PRODUCTOGTIN, PRODUCTOGTIN1, PRODUCTOCUENTAID, PRODUCTOCUENTAID1) VALUES ('rel_186_102_15', 'bidireccional', 186, 102, 1, 1);
+COMMIT;
+INSERT INTO producto VALUES (128, 'SKU001', 'Smartphone X', NULL, 'Teléfono inteligente', SYSDATE, NULL, 1, 'S');
+INSERT INTO atributo VALUES (1, 'Color', 'Texto', SYSDATE, 1);
+INSERT INTO atributosproducto VALUES ('Negro', 128, 1, 1);
+INSERT INTO activo VALUES (504, 'Imagen frontal', 1024, 'Imagen', 'http://example.com/img1.jpg', 1);
+INSERT INTO activo VALUES (505, 'Imagen lateral', 1024, 'Imagen', 'http://example.com/img2.jpg', 1);
+
+-- Producto 128 (Smartphone X) con activo 501 (Imagen frontal)
+INSERT INTO relacionproductoactivo VALUES (501, 1, 128, 1);
+
+-- Producto 128 con activo 502 (Imagen lateral)
+INSERT INTO relacionproductoactivo VALUES (502, 1, 128, 1);
+
+INSERT INTO atributosproducto VALUES ('Negro', 128, 101, 1);  
+INSERT INTO atributosproducto VALUES ('500g', 128, 102, 1);  
+INSERT INTO atributosproducto VALUES ('Aluminio', 128, 103, 1); 
+
+INSERT INTO categoriaactivos (id, nombre, cuentaid) VALUES 
+(1, 'Imágenes Principales', 1);
+INSERT INTO categoriaactivos (id, nombre, cuentaid) VALUES 
+(2, 'Imágenes Secundarias', 1);
+INSERT INTO categoriaactivos (id, nombre, cuentaid) VALUES 
+(3, 'Manuales de Usuario', 1);
+INSERT INTO categoriaactivos (id, nombre, cuentaid) VALUES 
+(4, 'Fichas Técnicas', 1);
+INSERT INTO categoriaactivos (id, nombre, cuentaid) VALUES 
+(5, 'Videos', 1);
+
+INSERT INTO relacionactivocategoriaactivo (activoid, activocuentaid, categoriaactivosid, categoriaactivoscuentaid) VALUES 
+(501, 1, 1, 1);
+INSERT INTO relacionactivocategoriaactivo (activoid, activocuentaid, categoriaactivosid, categoriaactivoscuentaid) VALUES
+(502, 1, 2, 1);
+INSERT INTO relacionactivocategoriaactivo (activoid, activocuentaid, categoriaactivosid, categoriaactivoscuentaid) VALUES
+(503, 1, 3, 1);
+INSERT INTO relacionactivocategoriaactivo (activoid, activocuentaid, categoriaactivosid, categoriaactivoscuentaid) VALUES
+(504, 1, 4, 1);
+
+commit;
 
 --POLITICA DE CONTRASEÑAS PERFIL
 CREATE PROFILE perfil_plytix LIMIT
