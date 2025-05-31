@@ -28,7 +28,7 @@ alter user plytix
 alter user plytix
    quota 1G on ts_indices;
 
-grant connect,resource,
+grant connect,resource,--perimitimos crrear objetos con resource
    create table
 to plytix;
 
@@ -73,7 +73,7 @@ alter table activo
    add constraint activopk
       primary key ( id,
                     cuentaid )
-         using index tablespace ts_indices;
+         using index tablespace ts_indices;--para q eñ omdoce de las clabes primarias sea tb el de ts_indices y no el por defecto
 
 
 
@@ -460,6 +460,7 @@ ADD CONSTRAINT uq_cuenta_nif UNIQUE (nif);
 
 -- 4. CREAMOS LAS TABLAS EXTERNAS
 create table productos_ext (
+--No incluyo gtin ni modificado: gtin se genera automáticamente con un TRIGGER y SEQUENCE, y modificado se puede actualizar después.
    sku        varchar2(50),
    nombre     varchar2(100),
    textocorto varchar2(1000),
@@ -517,8 +518,8 @@ select table_name,
 --6. CREAMOS VISTA MATERIALIZADA
 create materialized view vm_productos build immediate
    refresh complete
-   start with trunc(sysdate + 1)
-   next trunc(sysdate + 1)
+   start with trunc(sysdate + 1)--mañana a las 00:00
+   next trunc(sysdate + 1)--refrescará todos los días a las 00:00.
 as
    select *
      from productos_ext;
@@ -571,6 +572,12 @@ GRANT EXECUTE ON DBMS_RLS TO PLYTIX;
 -- desde plytix
 -- Añadir campo PUBLICO a la tabla PRODUCTO si no existe
 ALTER TABLE PRODUCTO ADD PUBLICO CHAR(1) DEFAULT 'S' CHECK (PUBLICO IN ('S', 'N'));
+
+--desde system
+GRANT CREATE VIEW TO plytix;
+
+--desde plytix
+
 -- creamos vista que muestra solo productos públicos
 CREATE OR REPLACE VIEW V_PRODUCTO_PUBLICO AS
 SELECT * FROM PRODUCTO WHERE PUBLICO = 'S';
@@ -602,10 +609,8 @@ FOR EACH ROW
 DECLARE
   v_cuenta_id NUMBER;
 BEGIN
-  -- Generar GTIN si no se indica
-  IF :NEW.GTIN IS NULL THEN
-    :NEW.GTIN := SEQ_PRODUCTOS.NEXTVAL;
-  END IF;
+if :new.GTIN is null then  
+:new.GTIN := SEQ_PRODUCTOS.NEXTVAL; 
 
   -- Obtener la cuenta del usuario conectado por nombre de sesión (igual que la vista V_PRODUCTOS_USUARIO)
   SELECT CuentaId INTO v_cuenta_id
