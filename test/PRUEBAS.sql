@@ -1,41 +1,41 @@
 --PRUEBAS INDIVIDUALES DE LAS FUNCIONES
 
--- Caso 1: Usuario v�lido
+-- Caso 1: Usuario válido
 BEGIN
   IF pkg_admin_productos.f_verificar_cuenta_usuario(1) THEN
-    DBMS_OUTPUT.PUT_LINE('f_verificar_cuenta_usuario (v�lido): OK');
+    DBMS_OUTPUT.PUT_LINE('f_verificar_cuenta_usuario (válido): OK');
   ELSE
-    DBMS_OUTPUT.PUT_LINE('f_verificar_cuenta_usuario (v�lido): acceso denegado');
+    DBMS_OUTPUT.PUT_LINE('f_verificar_cuenta_usuario (válido): acceso denegado');
   END IF;
 EXCEPTION
   WHEN OTHERS THEN
-    DBMS_OUTPUT.PUT_LINE('f_verificar_cuenta_usuario (v�lido): ERROR - ' || SQLERRM);
+    DBMS_OUTPUT.PUT_LINE('f_verificar_cuenta_usuario (válido): ERROR - ' || SQLERRM);
 END;
 /
 
--- Caso 2: Usuario inv�lido
+-- Caso 2: Usuario inválido
 BEGIN
   IF pkg_admin_productos.f_verificar_cuenta_usuario(9999) THEN
-    DBMS_OUTPUT.PUT_LINE('f_verificar_cuenta_usuario (inv�lido): ERROR - acceso concedido incorrectamente');
+    DBMS_OUTPUT.PUT_LINE('f_verificar_cuenta_usuario (inválido): ERROR - acceso concedido incorrectamente');
   ELSE
-    DBMS_OUTPUT.PUT_LINE('f_verificar_cuenta_usuario (inv�lido): acceso correctamente denegado');
+    DBMS_OUTPUT.PUT_LINE('f_verificar_cuenta_usuario (inválido): acceso correctamente denegado');
   END IF;
 EXCEPTION
   WHEN OTHERS THEN
-    DBMS_OUTPUT.PUT_LINE('f_verificar_cuenta_usuario (inv�lido): ERROR - ' || SQLERRM);
+    DBMS_OUTPUT.PUT_LINE('f_verificar_cuenta_usuario (inválido): ERROR - ' || SQLERRM);
 END;
 /
 
--- Cuenta v�lida con plan
+-- Cuenta válida con plan
 BEGIN
   DECLARE
     v_plan plan%ROWTYPE;
   BEGIN
     v_plan := pkg_admin_productos.f_obtener_plan_cuenta(1);
-    DBMS_OUTPUT.PUT_LINE('f_obtener_plan_cuenta (v�lida): OK - Plan ID: ' || v_plan.id);
+    DBMS_OUTPUT.PUT_LINE('f_obtener_plan_cuenta (válida): OK - Plan ID: ' || v_plan.id);
   EXCEPTION
     WHEN OTHERS THEN
-      DBMS_OUTPUT.PUT_LINE('f_obtener_plan_cuenta (v�lida): ERROR - ' || SQLERRM);
+      DBMS_OUTPUT.PUT_LINE('f_obtener_plan_cuenta (válida): ERROR - ' || SQLERRM);
   END;
 END;
 /
@@ -82,13 +82,15 @@ BEGIN
 END;
 /
 
--- Producto con atributos completos ---- FALTA POR METER DATOS EN LA TABLA ATRIBUTOS PRODUCTO
+-- Producto con atributos completos
 BEGIN
   DECLARE
     v_ok BOOLEAN;
   BEGIN
     v_ok := pkg_admin_productos.f_validar_atributos_producto(128, 1);
-    DBMS_OUTPUT.PUT_LINE('f_validar_atributos_producto (completo): Resultado: ' || CASE WHEN v_ok THEN 'TRUE' ELSE 'FALSE' END);
+    DBMS_OUTPUT.PUT_LINE('f_validar_atributos_producto (completo): Resultado: ' || 
+                         CASE WHEN v_ok THEN 'TRUE (todos los atributos tienen valor)' 
+                              ELSE 'FALSE (faltan atributos)' END);
   EXCEPTION
     WHEN OTHERS THEN
       DBMS_OUTPUT.PUT_LINE('f_validar_atributos_producto (completo): ERROR - ' || SQLERRM);
@@ -102,53 +104,84 @@ BEGIN
     v_ok BOOLEAN;
   BEGIN
     v_ok := pkg_admin_productos.f_validar_atributos_producto(9999, 1);
-    DBMS_OUTPUT.PUT_LINE('f_validar_atributos_producto (inexistente): Resultado: ' || CASE WHEN v_ok THEN 'TRUE' ELSE 'FALSE' END);
+    DBMS_OUTPUT.PUT_LINE('f_validar_atributos_producto (inexistente): Resultado inesperado: ' || 
+                         CASE WHEN v_ok THEN 'TRUE' ELSE 'FALSE' END);
   EXCEPTION
+    WHEN NO_DATA_FOUND THEN
+      DBMS_OUTPUT.PUT_LINE('f_validar_atributos_producto (inexistente): OK - Error esperado (producto no encontrado)');
     WHEN OTHERS THEN
       DBMS_OUTPUT.PUT_LINE('f_validar_atributos_producto (inexistente): ERROR - ' || SQLERRM);
   END;
 END;
 /
 
--- Cuenta con categor�as
+-- Cuenta con categorías
 BEGIN
   DECLARE
     v_cat NUMBER;
   BEGIN
     v_cat := pkg_admin_productos.f_num_categorias_cuenta(1);
-    DBMS_OUTPUT.PUT_LINE('f_num_categorias_cuenta (con categor�as): OK - Total: ' || v_cat);
+    DBMS_OUTPUT.PUT_LINE('f_num_categorias_cuenta (con categorías): OK - Total: ' || v_cat);
   EXCEPTION
     WHEN OTHERS THEN
-      DBMS_OUTPUT.PUT_LINE('f_num_categorias_cuenta (con categor�as): ERROR - ' || SQLERRM);
+      DBMS_OUTPUT.PUT_LINE('f_num_categorias_cuenta (con categorías): ERROR - ' || SQLERRM);
   END;
 END;
 /
 
--- Cuenta sin categor�as----
+-- Cuenta sin categorías
 BEGIN
   DECLARE
     v_cat NUMBER;
   BEGIN
     v_cat := pkg_admin_productos.f_num_categorias_cuenta(9999);
-    DBMS_OUTPUT.PUT_LINE('f_num_categorias_cuenta (sin categor�as): Total: ' || v_cat);
+    DBMS_OUTPUT.PUT_LINE('f_num_categorias_cuenta (sin categorías): Total: ' || v_cat);
   EXCEPTION
     WHEN OTHERS THEN
-      DBMS_OUTPUT.PUT_LINE('f_num_categorias_cuenta (sin categor�as): ERROR - ' || SQLERRM);
+      DBMS_OUTPUT.PUT_LINE('f_num_categorias_cuenta (sin categorías): ERROR - ' || SQLERRM);
   END;
 END;
 /
 
-
--- Caso 1: Actualizaci�n v�lida
+-- Prueba para f_lista_categorias_producto
 BEGIN
-  pkg_admin_productos.p_actualizar_nombre_producto(128, 1, 'Nombre Actualizado');
-  DBMS_OUTPUT.PUT_LINE('p_actualizar_nombre_producto (v�lido): OK');
-EXCEPTION
-  WHEN OTHERS THEN
-    DBMS_OUTPUT.PUT_LINE('p_actualizar_nombre_producto (v�lido): ERROR - ' || SQLERRM);
+  DECLARE
+    v_lista VARCHAR2(1000);
+  BEGIN
+    v_lista := pkg_admin_productos.f_lista_categorias_producto(128, 1);
+    DBMS_OUTPUT.PUT_LINE('f_lista_categorias_producto (producto existente): OK - Categorías: ' || v_lista);
+  EXCEPTION
+    WHEN OTHERS THEN
+      DBMS_OUTPUT.PUT_LINE('f_lista_categorias_producto (producto existente): ERROR - ' || SQLERRM);
+  END;
 END;
 /
 
+-- Prueba para f_lista_categorias_producto con producto inexistente
+BEGIN
+  DECLARE
+    v_lista VARCHAR2(1000);
+  BEGIN
+    v_lista := pkg_admin_productos.f_lista_categorias_producto(9999, 1);
+    DBMS_OUTPUT.PUT_LINE('f_lista_categorias_producto (producto inexistente): Resultado inesperado: ' || v_lista);
+  EXCEPTION
+    WHEN NO_DATA_FOUND THEN
+      DBMS_OUTPUT.PUT_LINE('f_lista_categorias_producto (producto inexistente): OK - Retornó "Sin categoría" como esperado');
+    WHEN OTHERS THEN
+      DBMS_OUTPUT.PUT_LINE('f_lista_categorias_producto (producto inexistente): ERROR - ' || SQLERRM);
+  END;
+END;
+/
+
+-- Caso 1: Actualización válida
+BEGIN
+  pkg_admin_productos.p_actualizar_nombre_producto(128, 1, 'Nombre Actualizado');
+  DBMS_OUTPUT.PUT_LINE('p_actualizar_nombre_producto (válido): OK');
+EXCEPTION
+  WHEN OTHERS THEN
+    DBMS_OUTPUT.PUT_LINE('p_actualizar_nombre_producto (válido): ERROR - ' || SQLERRM);
+END;
+/
 
 -- Caso 2: Nombre nulo
 BEGIN
@@ -160,17 +193,17 @@ EXCEPTION
 END;
 /
 
--- Caso 1: Asociaci�n v�lida
+-- Caso 1: Asociación válida
 BEGIN
   pkg_admin_productos.p_asociar_activo_a_producto(128, 1, 502, 1);
-  DBMS_OUTPUT.PUT_LINE('p_asociar_activo_a_producto (v�lido): OK');
+  DBMS_OUTPUT.PUT_LINE('p_asociar_activo_a_producto (válido): OK');
 EXCEPTION
   WHEN OTHERS THEN
-    DBMS_OUTPUT.PUT_LINE('p_asociar_activo_a_producto (v�lido): ERROR - ' || SQLERRM);
+    DBMS_OUTPUT.PUT_LINE('p_asociar_activo_a_producto (válido): ERROR - ' || SQLERRM);
 END;
 /
 
--- Caso 2: Asociaci�n duplicada --- EJECUTAR DESPU�S DEL DE ARRIBA
+-- Caso 2: Asociación duplicada
 BEGIN
   pkg_admin_productos.p_asociar_activo_a_producto(128, 1, 501, 1);
   DBMS_OUTPUT.PUT_LINE('p_asociar_activo_a_producto (duplicada): ERROR - Se esperaba error por duplicado');
@@ -200,7 +233,28 @@ EXCEPTION
 END;
 /
 
--- Caso 1: Actualizar Producto ---- PRUEBA JAVI DESDE TU ORDENADOR
+-- Prueba para p_migrar_productos_a_categoria
+BEGIN
+  -- Asume que existen las categorías 1 y 2 en la cuenta 1
+  pkg_admin_productos.p_migrar_productos_a_categoria(1, 1, 2);
+  DBMS_OUTPUT.PUT_LINE('p_migrar_productos_a_categoria (válido): OK');
+EXCEPTION
+  WHEN OTHERS THEN
+    DBMS_OUTPUT.PUT_LINE('p_migrar_productos_a_categoria (válido): ERROR - ' || SQLERRM);
+END;
+/
+
+-- Prueba para p_migrar_productos_a_categoria con categoría no existente
+BEGIN
+  pkg_admin_productos.p_migrar_productos_a_categoria(1, 999, 998);
+  DBMS_OUTPUT.PUT_LINE('p_migrar_productos_a_categoria (categorías no existentes): ERROR - Se esperaba error');
+EXCEPTION
+  WHEN OTHERS THEN
+    DBMS_OUTPUT.PUT_LINE('p_migrar_productos_a_categoria (categorías no existentes): OK - Error controlado: ' || SQLERRM);
+END;
+/
+
+-- Caso 1: Actualizar Producto
 BEGIN
   pkg_admin_productos.p_actualizar_productos(1);
   DBMS_OUTPUT.PUT_LINE('p_actualizar_productos: OK');
@@ -210,8 +264,7 @@ EXCEPTION
 END;
 /
 
--- Caso 1: Usuario Nuevo --- Fallo con los permisos de create user
-
+-- Caso 1: Usuario Nuevo
 DECLARE
   v_usuario usuario%ROWTYPE;
 BEGIN
@@ -228,7 +281,7 @@ BEGIN
   -- Llamada al procedimiento
   pkg_admin_productos.p_crear_usuario(
     p_usuario  => v_usuario,
-    p_rol      => '',
+    p_rol      => 'ROL_CLIENTE', -- Rol debe ser especificado
     p_password => 'Test1234'
   );
 
@@ -239,6 +292,3 @@ EXCEPTION
     DBMS_OUTPUT.PUT_LINE('ERROR: ' || SQLERRM);
 END;
 /
-
-
-

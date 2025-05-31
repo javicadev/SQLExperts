@@ -169,31 +169,65 @@ END;
 FUNCTION f_lista_categorias_producto (
   p_producto_gtin IN producto.gtin%TYPE,
   p_cuenta_id     IN producto.cuentaid%TYPE
-) RETURN VARCHAR2 IS
-  v_lista   VARCHAR2(1000);
+) RETURN VARCHAR2
+IS
+  v_lista   VARCHAR2(1000) := '';
   v_mensaje VARCHAR2(500);
 BEGIN
-  -- Verificar acceso
+  --------------------------------------------------------------------------
+  -- Paso 1: Verificar acceso del usuario a la cuenta
+  --------------------------------------------------------------------------
   IF NOT f_verificar_cuenta_usuario(p_cuenta_id) THEN
     RAISE_APPLICATION_ERROR(-20001, 'Acceso no autorizado.');
   END IF;
 
-  -- Obtener lista de categorías
-  SELECT LISTAGG(c.nombre, ', ')
-         WITHIN GROUP (ORDER BY c.nombre)
-  INTO v_lista
-  FROM relacionproductocategoria rpc
-  JOIN categoria c
-    ON rpc.categoriaid = c.id AND rpc.categoriacuentaid = c.cuentaid
-  WHERE rpc.productogtin = p_producto_gtin
-    AND rpc.productocuentaid = p_cuenta_id;
+  --------------------------------------------------------------------------
+  -- Paso 2: Verificar que el producto existe en la tabla PRODUCTO
+  --------------------------------------------------------------------------
+  DECLARE
+    v_dummy NUMBER;
+  BEGIN
+    SELECT 1 INTO v_dummy
+    FROM producto
+    WHERE gtin = p_producto_gtin AND cuentaid = p_cuenta_id;
+  EXCEPTION
+    WHEN NO_DATA_FOUND THEN
+      RAISE NO_DATA_FOUND; -- Producto no existe
+  END;
 
+  --------------------------------------------------------------------------
+  -- Paso 3: Obtener categorías y concatenarlas con delimitador ' ; '
+  --------------------------------------------------------------------------
+  FOR cat IN (
+    SELECT c.nombre
+    FROM relacionproductocategoria rpc
+    JOIN categoria c
+      ON rpc.categoriaid = c.id AND rpc.categoriacuentaid = c.cuentaid
+    WHERE rpc.productogtin = p_producto_gtin
+      AND rpc.productocuentaid = p_cuenta_id
+  ) LOOP
+    IF v_lista IS NOT NULL AND v_lista != '' THEN
+      v_lista := v_lista || ' ; ' || cat.nombre;
+    ELSE
+      v_lista := cat.nombre;
+    END IF;
+  END LOOP;
+
+  --------------------------------------------------------------------------
+  -- Paso 4: Devolver la lista (o cadena vacía si no hay categorías)
+  --------------------------------------------------------------------------
   RETURN NVL(v_lista, '');
 
 EXCEPTION
+  --------------------------------------------------------------------------
+  -- Si no se encuentra el producto
+  --------------------------------------------------------------------------
   WHEN NO_DATA_FOUND THEN
-    RETURN ''; -- Producto sin categorías
+    RETURN 'Sin categoría'; -- O RETURN '' si prefieres cadena vacía
 
+  --------------------------------------------------------------------------
+  -- Captura de cualquier otro error: registrar en TRAZA y relanzar
+  --------------------------------------------------------------------------
   WHEN OTHERS THEN
     v_mensaje := SUBSTR(SQLCODE || ' ' || SQLERRM, 1, 500);
     INSERT INTO traza VALUES (
@@ -203,49 +237,88 @@ EXCEPTION
       v_mensaje
     );
     RAISE;
-END;
+END f_lista_categorias_producto;
 
 --P3: p_migrar_productos_a_categorias
 PROCEDURE p_migrar_productos_a_categoria (
-  p_categoria_id       IN categoria.id%TYPE,
-  p_categoria_cuentaid IN categoria.cuentaid%TYPE
-) IS
+  p_cuenta_id            IN cuenta.id%TYPE,
+  p_categoria_origen_id  IN categoria.id%TYPE,
+  p_categoria_destino_id IN categoria.id%TYPE
+)
+IS
   v_mensaje VARCHAR2(500);
+  dummy NUMBER;
+
+  -- Cursor para recorrer productos en la categoría origen
+  CURSOR c_productos IS
+    SELECT productogtin, productocuentaid
+    FROM relacionproductocategoria
+    WHERE categoriaid = p_categoria_origen_id
+      AND categoriacuentaid = p_cuenta_id
+    FOR UPDATE;
+
 BEGIN
-  -- Paso 1: Verificar que el usuario conectado tiene acceso a la cuenta de la categoría
-  IF NOT f_verificar_cuenta_usuario(p_categoria_cuentaid) THEN
+  ---------------------------------------------------------------------------
+  -- Paso 1: Verificar que el usuario tiene acceso a la cuenta
+  ---------------------------------------------------------------------------
+  IF NOT pkg_admin_productos.f_verificar_cuenta_usuario(p_cuenta_id) THEN
     RAISE_APPLICATION_ERROR(-20001, 'Acceso no autorizado a la cuenta.');
   END IF;
 
-  -- Paso 2: Verificar que la categoría existe
-  DECLARE
-    v_dummy NUMBER;
+  ---------------------------------------------------------------------------
+  -- Paso 2: Verificar que ambas categorías existen y pertenecen a la cuenta
+  ---------------------------------------------------------------------------
   BEGIN
-    SELECT 1 INTO v_dummy
+    -- Verificar categoría origen
+    SELECT 1
+    INTO dummy
     FROM categoria
-    WHERE id = p_categoria_id
-      AND cuentaid = p_categoria_cuentaid;
+    WHERE id = p_categoria_origen_id AND cuentaid = p_cuenta_id;
+
+    -- Verificar categoría destino
+    SELECT 1
+    INTO dummy
+    FROM categoria
+    WHERE id = p_categoria_destino_id AND cuentaid = p_cuenta_id;
   EXCEPTION
     WHEN NO_DATA_FOUND THEN
-      RAISE_APPLICATION_ERROR(-20002, 'La categoría indicada no existe.');
+      RAISE_APPLICATION_ERROR(-20002, 'Una de las categorías no existe o no pertenece a la cuenta.');
   END;
 
-  -- Paso 3: Insertar relaciones para productos sin categoría
-  INSERT INTO relacionproductocategoria (
-    categoriaid, categoriacuentaid, productogtin, productocuentaid
-  )
-  SELECT
-    p_categoria_id, p_categoria_cuentaid, pr.gtin, pr.cuentaid
-  FROM producto pr
-  WHERE pr.cuentaid = p_categoria_cuentaid
-    AND NOT EXISTS (
-      SELECT 1 FROM relacionproductocategoria rpc
-      WHERE rpc.productogtin = pr.gtin
-        AND rpc.productocuentaid = pr.cuentaid
-    );
+  ---------------------------------------------------------------------------
+  -- Paso 3: Migrar los productos de la categoría origen a la categoría destino
+  ---------------------------------------------------------------------------
+  FOR r IN c_productos LOOP
+    -- Evitar duplicados: comprobar si ya existe en la categoría destino
+    BEGIN
+      SELECT 1 INTO dummy
+      FROM relacionproductocategoria
+      WHERE categoriaid = p_categoria_destino_id
+        AND categoriacuentaid = p_cuenta_id
+        AND productogtin = r.productogtin
+        AND productocuentaid = r.productocuentaid;
+
+      -- Si llega aquí, ya existe => lo borramos de la categoría origen
+      DELETE FROM relacionproductocategoria
+      WHERE categoriaid = p_categoria_origen_id
+        AND categoriacuentaid = p_cuenta_id
+        AND productogtin = r.productogtin
+        AND productocuentaid = r.productocuentaid;
+
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        -- No existe en la categoría destino, lo actualizamos (migramos)
+        UPDATE relacionproductocategoria
+        SET categoriaid = p_categoria_destino_id
+        WHERE CURRENT OF c_productos;
+    END;
+  END LOOP;
+
+  COMMIT;
 
 EXCEPTION
   WHEN OTHERS THEN
+    ROLLBACK;
     v_mensaje := SUBSTR(SQLCODE || ' ' || SQLERRM, 1, 500);
     INSERT INTO traza VALUES (
       SYSDATE,
@@ -254,7 +327,7 @@ EXCEPTION
       v_mensaje
     );
     RAISE;
-END;
+END p_migrar_productos_a_categoria;
 
 --P4:p_replicar_atributos
 

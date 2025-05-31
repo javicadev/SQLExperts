@@ -1077,16 +1077,18 @@ PROCEDURE p_crear_usuario (
   p_usuario   IN usuario%ROWTYPE,
   p_rol       IN VARCHAR2,
   p_password  IN VARCHAR2
-) IS
+) 
+IS
   v_mensaje VARCHAR2(500);
 BEGIN
   -- Paso 1: Crear el usuario en Oracle
   EXECUTE IMMEDIATE 'CREATE USER "' || p_usuario.nombreusuario || '" IDENTIFIED BY "' || p_password || '"';
 
-  -- Paso 2: Conceder permisos mínimos y el rol correspondiente
+  -- Paso 2: Conceder permisos mÃ­nimos y el rol correspondiente
   EXECUTE IMMEDIATE 'GRANT CONNECT TO "' || p_usuario.nombreusuario || '"';
   EXECUTE IMMEDIATE 'GRANT "' || p_rol || '" TO "' || p_usuario.nombreusuario || '"';
-
+  
+  
   -- Paso 3: Insertar datos del usuario en la tabla USUARIO
   INSERT INTO usuario (
     id, nombreusuario, nombrecompleto, avatar,
