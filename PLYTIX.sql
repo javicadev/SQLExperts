@@ -1315,7 +1315,7 @@ BEGIN
 
   -- Paso 3: Actualizar el nombre
   UPDATE producto
-  SET nombre = p_nuevo_nombre
+  SET nombre = p_nuevo_nombre, modificado=SYSDATE
   WHERE gtin = p_producto_gtin AND cuentaid = p_cuenta_id;
 
   -- Paso 4: Verificar que se ha actualizado alguna fila
@@ -1352,7 +1352,7 @@ PROCEDURE p_asociar_activo_a_producto (
   p_activo_id             IN activo.id%TYPE,
   p_activo_cuenta_id      IN activo.cuentaid%TYPE
 ) IS
-  v_dummy   NUMBER;
+  v_1   NUMBER;
   v_mensaje VARCHAR2(500);
 BEGIN
   -- Paso 1: Verificar acceso del usuario a la cuenta del producto
@@ -1361,29 +1361,31 @@ BEGIN
   END IF;
 
   -- Paso 2: Verificar que el producto existe
-  SELECT 1 INTO v_dummy
+  SELECT 1 INTO v_1
   FROM producto
   WHERE gtin = p_producto_gtin AND cuentaid = p_producto_cuenta_id;
-
+--si falla, lanza automatic no data found
   -- Paso 3: Verificar que el activo existe
-  SELECT 1 INTO v_dummy
+  SELECT 1 INTO v_1
   FROM activo
   WHERE id = p_activo_id AND cuentaid = p_activo_cuenta_id;
+--si falla, lanza automatic no data found
 
   -- Paso 4: Verificar que la relación no existe ya
   BEGIN
-    SELECT 1 INTO v_dummy
+    SELECT 1 INTO v_1
     FROM relacionproductoactivo
     WHERE productogtin = p_producto_gtin
       AND productocuentaid = p_producto_cuenta_id
       AND activoid = p_activo_id
       AND activocuentaid = p_activo_cuenta_id;
+--si falla, lanza automatic la execptionde debajoo
 
     -- Si encuentra, ya existe
     RAISE_APPLICATION_ERROR(-20002, 'Asociación ya existente.');
   EXCEPTION
     WHEN NO_DATA_FOUND THEN
-      -- No existe: OK
+      -- No existe: OK--hacemos null para q no se lance la excepcion y continuo el procedimiento
       NULL;
   END;
 
@@ -1417,6 +1419,9 @@ EXCEPTION
     );
     RAISE;
 END p_asociar_activo_a_producto;
+
+
+
 
 --P7: p_eliminar_producto_y_asociaciones
 PROCEDURE p_eliminar_producto_y_asociaciones (
@@ -1480,50 +1485,56 @@ EXCEPTION
     RAISE;
 END p_eliminar_producto_y_asociaciones;
 
+
 --P8: p_actualizar_productos
 PROCEDURE p_actualizar_productos (
   p_cuenta_id IN cuenta.id%TYPE
 ) IS
   v_mensaje VARCHAR2(500);
+  v_1 NUMBER;
+
 BEGIN
   -- Paso 1: Verificar acceso del usuario
   IF NOT f_verificar_cuenta_usuario(p_cuenta_id) THEN
     RAISE_APPLICATION_ERROR(-20001, 'Acceso no autorizado a la cuenta.');
   END IF;
 
-  -- Paso 2: Insertar o actualizar productos de productos_ext
   FOR r IN (
-    SELECT * FROM productos_ext
-    WHERE cuentaid = p_cuenta_id
-  ) LOOP
-    BEGIN
-      -- Intentar actualizar si existe (comparando por SKU + cuentaid)
-      UPDATE producto
-      SET nombre = r.nombre,
-          textocorto = r.textocorto
-      WHERE sku = r.sku AND cuentaid = r.cuentaid;
+  SELECT * FROM productos_ext WHERE cuentaid = p_cuenta_id
+) LOOP
+  DECLARE
+    v_gtin producto.gtin%TYPE;
+    v_nombre_actual producto.nombre%TYPE;
+  BEGIN
+    -- Intentar obtener nombre y gtin
+    SELECT nombre, gtin INTO v_nombre_actual, v_gtin
+    FROM producto
+    WHERE sku = r.sku AND cuentaid = r.cuentaid;
 
-      IF SQL%ROWCOUNT = 0 THEN
-        -- Si no existe, insertar
-        INSERT INTO producto (
-          gtin, sku, nombre, textocorto, creado, cuentaid
-        ) VALUES (
-          seq_productos.NEXTVAL,
-          r.sku, r.nombre, r.textocorto, r.creado, r.cuentaid
-        );
-      END IF;
+    IF v_nombre_actual != r.nombre THEN
+      p_actualizar_nombre_producto(
+        p_producto_gtin => v_gtin,
+        p_cuenta_id     => r.cuentaid,
+        p_nuevo_nombre  => r.nombre
+      );
+    END IF;
 
-    EXCEPTION
-      WHEN OTHERS THEN
-        v_mensaje := SUBSTR(SQLCODE || ' ' || SQLERRM, 1, 500);
-        INSERT INTO traza VALUES (
-          SYSDATE,
-          SYS_CONTEXT('USERENV','SESSION_USER'),
-          'p_actualizar_productos',
-          v_mensaje
-        );
-    END;
-  END LOOP;
+    UPDATE producto
+    SET textocorto = r.textocorto,
+        modificado = SYSDATE
+    WHERE sku = r.sku AND cuentaid = r.cuentaid;
+
+  EXCEPTION
+    WHEN NO_DATA_FOUND THEN
+      INSERT INTO producto (
+        gtin, sku, nombre, textocorto, creado, cuentaid
+      ) VALUES (
+        seq_productos.NEXTVAL,
+        r.sku, r.nombre, r.textocorto, r.creado, r.cuentaid
+      );
+  END;
+END LOOP;
+
 
   -- Paso 3: Eliminar productos que ya no están en productos_ext
   FOR p IN (
