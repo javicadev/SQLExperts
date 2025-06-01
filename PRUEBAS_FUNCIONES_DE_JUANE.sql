@@ -2,7 +2,6 @@
 
 
 
-
 -- Caso 1: Actualización válida
 BEGIN
   pkg_admin_productos.p_actualizar_nombre_producto(128, 1, 'Nombre Actualizado');
@@ -37,7 +36,7 @@ END;
 
 -- Caso 1: Asociación válida
 BEGIN
-  pkg_admin_productos.p_asociar_activo_a_producto(186, 1, 502, 1);
+  pkg_admin_productos.p_asociar_activo_a_producto(186, 1, 510, 1);
   DBMS_OUTPUT.PUT_LINE('p_asociar_activo_a_producto (válido): OK');
 EXCEPTION
   WHEN OTHERS THEN
@@ -53,4 +52,3 @@ EXCEPTION
   WHEN OTHERS THEN
     DBMS_OUTPUT.PUT_LINE('p_asociar_activo_a_producto (duplicada): OK - Error controlado: ' || SQLERRM);
 END;
-
