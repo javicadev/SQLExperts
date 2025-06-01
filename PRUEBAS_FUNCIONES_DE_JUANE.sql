@@ -36,7 +36,7 @@ END;
 
 -- Caso 1: Asociación válida
 BEGIN
-  pkg_admin_productos.p_asociar_activo_a_producto(186, 1, 510, 1);
+  pkg_admin_productos.p_asociar_activo_a_producto(186, 1, 505, 1);
   DBMS_OUTPUT.PUT_LINE('p_asociar_activo_a_producto (válido): OK');
 EXCEPTION
   WHEN OTHERS THEN
