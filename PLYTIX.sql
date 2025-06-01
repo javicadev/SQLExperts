@@ -868,27 +868,8 @@ INSERT INTO CATEGORIA (ID, NOMBRE, CUENTAID) VALUES (25, 'Electrónica 25', 2);
 INSERT INTO CATEGORIA (ID, NOMBRE, CUENTAID) VALUES (26, 'Ropa 26', 2);
 INSERT INTO CATEGORIA (ID, NOMBRE, CUENTAID) VALUES (27, 'Electrónica 27', 2);
 commit;
-INSERT INTO usuario (
-   id,
-   nombreusuario,
-   nombrecompleto,
-   avatar,
-   correoelectronico,
-   telefono,
-   cuentaid,
-   cuentadueno
-)
-VALUES (
-   1000,
-   'PLYTIX',
-   'Juane',
-   'https://avatar.example.com/juane.png',
-   'juane@plytix.com',
-   600123456,
-   1,
-   1
-);
-
+INSERT INTO usuario (   id,nombreusuario, nombrecompleto,avatar,correoelectronico,telefono,cuentaid,cuentadueno)
+VALUES (   1000, 'PLYTIX', 'Juane','https://avatar.example.com/juane.png','juane@plytix.com',600123456,1,1);
 COMMIT;
 
 
