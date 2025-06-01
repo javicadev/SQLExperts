@@ -597,7 +597,7 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON ACTIVO TO usuario_estandar;
 -- Permitimos gestionar la tabla de relación entre activos y categorías.
 -- De nuevo, se asume que se controla que los activos y categorías sean de la misma cuenta.
 
-GRANT SELECT, INSERT, UPDATE, DELETE ON Categoriaactivos TO usuario_estandar;
+--GRANT SELECT, INSERT, UPDATE, DELETE ON Categoriaactivos TO usuario_estandar;
 GRANT SELECT, INSERT, UPDATE, DELETE ON RELACIONACTIVOCATEGORIAACTIVO TO usuario_estandar;
 
 
@@ -640,7 +640,7 @@ BEGIN
 END;
 /
 
---Esta vista garantiza que muestra relaciones validas entre Categoría y Activo que pertenezcan a la misma cuenta
+--Esta vista garantiza que muestra relaciones validas entre activo y Categoría de activos  que pertenezcan a la misma cuenta
 CREATE OR REPLACE VIEW V_REL_ACTIVO_CAT_VALIDAS AS
 SELECT r.* FROM RelacionActivoCategoriaActivo r
 JOIN Activo a ON r.ActivoId = a.Id AND r.ActivoCuentaId = a.CuentaId
@@ -649,7 +649,7 @@ WHERE a.CuentaId = c.CuentaId;
 
 GRANT SELECT ON V_REL_ACTIVO_CAT_VALIDAS TO usuario_estandar;
 
---Asegura que la relación Activo-Categoría sea entre ambos elementos sean de la misma cuenta
+--Asegura que la relación Activo-Categoríaactivos sea entre ambos elementos  de la misma cuenta
 -- y la vista permite consultar solo relaciones válidas.
 create or replace trigger tr_valida_rel_activo_cat before
    insert or update on relacionactivocategoriaactivo
@@ -657,8 +657,13 @@ create or replace trigger tr_valida_rel_activo_cat before
 declare
    v_cuenta_activo    number;
    v_cuenta_categoria number;
-begin
+   v_cuenta_usuario number;
 
+begin
+--obtenr cuenta real del user
+  SELECT CuentaId INTO v_cuenta_usuario
+  FROM USUARIO
+  WHERE NombreUsuario = USER;
   -- Obtener la cuenta real del activo
    select cuentaid
      into v_cuenta_activo
@@ -670,10 +675,10 @@ begin
      from categoriaactivos
     where id = :new.categoriaactivosid;
   -- Validar que ambos pertenezcan a la misma cuenta
-   if v_cuenta_activo != v_cuenta_categoria then
+IF v_cuenta_activo != v_cuenta_categoria OR v_cuenta_activo != v_cuenta_usuario THEN
       raise_application_error(
          -20001,
-         'El Activo y la Categoría deben pertenecer a la misma cuenta.'
+         'El Activo y la Categoría deben pertenecer a la misma cuenta del usuario.'
       );
    end if;
 end;
@@ -684,7 +689,7 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON CATEGORIA TO usuario_estandar;
 
 -- Permisos sobre la tabla intermedia de relación producto-categoría
 GRANT SELECT, INSERT, UPDATE, DELETE ON RelacionProductoCategoria TO usuario_estandar;
-
+--vista para mostrar solo relaciones con producto y categoria de la misma cuenta
 CREATE OR REPLACE VIEW V_REL_PRODUCTO_CATEGORIA_VALIDAS AS
 SELECT rpc.*
 FROM RelacionProductoCategoria rpc
@@ -693,24 +698,32 @@ JOIN Categoria c ON rpc.CategoriaId = c.Id AND rpc.CategoriaCuentaId = c.CuentaI
 WHERE p.CuentaId = c.CuentaId;
 GRANT SELECT ON V_REL_PRODUCTO_CATEGORIA_VALIDAS TO usuario_estandar;
 
-
+--trigger para comprobar que la cuenta del producto y la categoria es la misma al insertar o update
 CREATE OR REPLACE TRIGGER TR_REL_PRODUCTO_CATEGORIA
 BEFORE INSERT OR UPDATE ON RelacionProductoCategoria
 FOR EACH ROW
 DECLARE
   v_cuenta_producto NUMBER;
   v_cuenta_categoria NUMBER;
+  v_cuenta_usuario NUMBER;
 BEGIN
+  --obtenr cuenta real del user
+  SELECT CuentaId INTO v_cuenta_usuario
+  FROM USUARIO
+  WHERE NombreUsuario = USER;
+
+--obtenr cuenta real del producto
   SELECT CuentaId INTO v_cuenta_producto
   FROM Producto
   WHERE GTIN = :NEW.ProductoGTIN;
 
+--obtengo cuenta real de la actegoria
   SELECT CuentaId INTO v_cuenta_categoria
   FROM Categoria
   WHERE Id = :NEW.CategoriaId;
 
-  IF v_cuenta_producto != v_cuenta_categoria THEN
-    RAISE_APPLICATION_ERROR(-20020, 'Producto y categoría deben pertenecer a la misma cuenta.');
+IF v_cuenta_producto != v_cuenta_categoria OR v_cuenta_producto != v_cuenta_usuario THEN
+    RAISE_APPLICATION_ERROR(-20020, 'Producto y categoría deben pertenecer a la misma cuenta del usuario.');
   END IF;
 END;
 /
@@ -735,6 +748,7 @@ EXCEPTION
     RETURN '1=0'; -- No permitir acceso si el usuario no está en la tabla USUARIO
 END;
 /
+--aplicamos la politica
 BEGIN
   DBMS_RLS.ADD_POLICY(
     object_schema   => 'PLYTIX',
@@ -743,7 +757,7 @@ BEGIN
     function_schema => 'PLYTIX',
     policy_function => 'POLITICA_RELACIONADO',
     statement_types => 'SELECT, INSERT, UPDATE, DELETE',
-    update_check    => TRUE
+    update_check    => TRUE--tb cd update
   );
 END;
 /
