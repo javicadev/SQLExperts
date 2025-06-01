@@ -649,7 +649,7 @@ WHERE a.CuentaId = c.CuentaId;
 
 GRANT SELECT ON V_REL_ACTIVO_CAT_VALIDAS TO usuario_estandar;
 
---Asegura que la relación Activo-Categoríaactivos sea entre ambos elementos  de la misma cuenta
+--Aseguramos que la relación Activo-Categoríaactivos sea entre ambos elementos  de la misma cuenta
 -- y la vista permite consultar solo relaciones válidas.
 create or replace trigger tr_valida_rel_activo_cat before
    insert or update on relacionactivocategoriaactivo
