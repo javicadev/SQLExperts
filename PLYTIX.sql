@@ -660,7 +660,7 @@ declare
    v_cuenta_usuario number;
 
 begin
---obtenr cuenta real del user
+--obtener cuenta real del user
   SELECT CuentaId INTO v_cuenta_usuario
   FROM USUARIO
   WHERE NombreUsuario = USER;
@@ -1058,7 +1058,7 @@ END pkg_admin_productos;
 
 --CUERPO DEL PAQUETE
 CREATE OR REPLACE PACKAGE BODY pkg_admin_productos IS
---auxiliar
+-- auxiliar
    FUNCTION f_verificar_cuenta_usuario (
       p_cuentaid in cuenta.id%type
    ) return boolean is
@@ -1068,12 +1068,11 @@ CREATE OR REPLACE PACKAGE BODY pkg_admin_productos IS
       select count(*)
         into v_dummy
         from usuario
-       where upper(nombreusuario) = upper(sys_context(
-            'USERENV',
-            'SESSION_USER'
-         ))
-         and cuentaid = p_cuentaid;
-
+       where upper(nombreusuario) = upper(sys_context('USERENV','SESSION_USER'))--usuario conectado
+         and cuentaid = p_cuentaid;-- que sea igual a la cuenta indicada
+      -- Si el usuario pertenece a la cuenta, v_dummy será mayor que 0
+      -- Si no pertenece, se lanzará una excepción no_data_found
+      -- y se registrará el error en la tabla traza.
       if v_dummy > 0 then
          return true;
       else
@@ -1087,23 +1086,17 @@ CREATE OR REPLACE PACKAGE BODY pkg_admin_productos IS
          v_mensaje );
          return false;
       when others then
-         v_mensaje := substr(
-            sqlcode
-            || ' '
-            || sqlerrm,
-            1,
-            500
-         );
-         insert into traza values ( sysdate,
-    sys_context('USERENV', 'SESSION_USER'),
+         v_mensaje := substr(sqlcode|| ' '|| sqlerrm,1,500);
+         insert into traza values ( sysdate,sys_context('USERENV', 'SESSION_USER'),
     'f_verificar_cuenta_usuario',v_mensaje );
          return false;
    end;
 
 --F1:f_obtener_plan_cuenta
 FUNCTION f_obtener_plan_cuenta (
-  p_cuenta_id IN cuenta.id%TYPE
-) RETURN plan%ROWTYPE IS
+  p_cuenta_id IN cuenta.id%TYPE-- le paso por parámetro el id de la cuenta
+) RETURN plan%ROWTYPE IS -- devuelve una fila de la tabla plan (es decir todos los datos de un plan)
+  -- Variables locales (guardamos el plan y mensajes de error)
   v_plan     plan%ROWTYPE;
   v_mensaje  VARCHAR2(500);
 BEGIN
@@ -1120,7 +1113,8 @@ BEGIN
   FROM cuenta c
   JOIN plan p ON c.planid = p.id
   WHERE c.id = p_cuenta_id;
-
+  -- Si no se encuentra el plan, se lanzará una excepción NO_DATA_FOUND
+  -- y se registrará el error en la tabla traza.
   RETURN v_plan;
 
 EXCEPTION
@@ -1133,6 +1127,9 @@ EXCEPTION
       v_mensaje
     );
     RAISE;
+  -- Capturamos cualquier otro error
+   -- SQLCODE devuelve el número del error y SQLERRM su mensaje
+   -- Concatenamos ambos y lo recortamos a 500 caracteres, ademas lo metemos en la tabla traza
 
   WHEN OTHERS THEN
     v_mensaje := SUBSTR(SQLCODE || ' ' || SQLERRM, 1, 500);
@@ -1153,12 +1150,12 @@ FUNCTION f_contar_productos_cuenta (
   v_total    NUMBER;
   v_mensaje  VARCHAR2(500);
 BEGIN
-  -- Paso 1: Verificar que el usuario pertenece a la cuenta
+  -- Verificar que el usuario pertenece a la cuenta
   IF NOT f_verificar_cuenta_usuario(p_cuenta_id) THEN
     RAISE_APPLICATION_ERROR(-20001, 'Acceso no autorizado a la cuenta.');
   END IF;
 
-  -- Paso 2: Contar productos asociados a la cuenta
+  --Contamos productos asociados a la cuenta
   SELECT COUNT(*)
   INTO v_total
   FROM producto
@@ -1166,6 +1163,7 @@ BEGIN
 
   RETURN v_total;
 
+--Excepciones para manejar errores
 EXCEPTION
   WHEN NO_DATA_FOUND THEN
     v_mensaje := 'Cuenta no encontrada';
@@ -1251,8 +1249,8 @@ END f_validar_atributos_producto;
 FUNCTION f_num_categorias_cuenta (
   p_cuenta_id IN cuenta.id%TYPE
 ) RETURN NUMBER IS
-  v_total    NUMBER;
-  v_mensaje  VARCHAR2(500);
+  v_total    NUMBER; --almacena el número de categorías
+  v_mensaje  VARCHAR2(500); --almacena mensajes de error
 BEGIN
   -- Paso 1: Validar acceso del usuario a la cuenta
   IF NOT f_verificar_cuenta_usuario(p_cuenta_id) THEN
@@ -2026,8 +2024,17 @@ END p_migrar_productos_a_categoria;
 end pkg_admin_productos_avanzado;
 /
 
+--ACTIVAMOS AUDITORIA
+alter system set audit_trail = db scope = spfile;
+SHUTDOWN IMMEDIATE;
+startup;
+
+--COMPROBAMOS QUE FUNCIONA
+SHOW PARAMETER audit_trail;
+
 
 --JOBS
+ -- Borra registros antiguos de la tabla de auditoría TRAZA
 begin
    dbms_scheduler.create_job(
       job_name        => 'J_LIMPIA_TRAZA',
@@ -2047,6 +2054,8 @@ end;
 /
 
 begin
+  -- Cursor que recorre todas las cuentas existentes
+    -- y crea un job para actualizar productos de cada cuenta
    dbms_scheduler.create_job(
       job_name        => 'J_ACTUALIZA_PRODUCTOS',
       job_type        => 'PLSQL_BLOCK',
