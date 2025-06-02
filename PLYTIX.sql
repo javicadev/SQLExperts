@@ -1514,10 +1514,7 @@ BEGIN
       );
     END IF;
 
-    UPDATE producto
-    SET textocorto = r.textocorto,
-        modificado = SYSDATE
-    WHERE sku = r.sku AND cuentaid = r.cuentaid;
+
 
   EXCEPTION
     WHEN NO_DATA_FOUND THEN
